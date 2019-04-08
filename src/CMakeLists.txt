@@ -8,12 +8,12 @@ endif()
 set(CMAKE_SHARED_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-undefined -Wl,dynamic_lookup")
 set(PLLMOD_INCLUDE_PATH  ${PLLMODULES_LIBPLL_PATH}/src/)
 
-set(PLLMODULES_COMPONENTS "optimize;algorithm;binary;msa;tree;util" CACHE STRING "pll-modules components to build")
+set(PLLMODULES_COMPONENTS "optimize;algorithm;binary;msa;tree;util;network" CACHE STRING "pll-modules components to build")
 
 foreach(module ${PLLMODULES_COMPONENTS})
   MESSAGE(STATUS "Will compile pll-module ${module}")
   add_subdirectory(${module})
 endforeach()
 
-set(PLLMOD_EXPORTED_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/algorithm/" "${CMAKE_CURRENT_SOURCE_DIR}/binary" "${CMAKE_CURRENT_SOURCE_DIR}/msa" "${CMAKE_CURRENT_SOURCE_DIR}/optimize"  "${CMAKE_CURRENT_SOURCE_DIR}/tree" "${CMAKE_CURRENT_SOURCE_DIR}/util" ${LIBPLL_SRC} PARENT_SCOPE)
+set(PLLMOD_EXPORTED_INCLUDE_PATH ${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/algorithm/" "${CMAKE_CURRENT_SOURCE_DIR}/binary" "${CMAKE_CURRENT_SOURCE_DIR}/msa" "${CMAKE_CURRENT_SOURCE_DIR}/optimize"  "${CMAKE_CURRENT_SOURCE_DIR}/tree" "${CMAKE_CURRENT_SOURCE_DIR}/util" "${CMAKE_CURRENT_SOURCE_DIR}/network" ${LIBPLL_SRC} PARENT_SCOPE)
 
