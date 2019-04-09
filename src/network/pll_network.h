@@ -31,7 +31,7 @@ typedef struct pll_displayed_tree_s
   double * branch_lengths;
   pll_operation_t * operations;
   unsigned int ops_count;
-  unsigned int * matrix_indices;
+  unsigned int * pmatrix_indices;
   unsigned int matrix_count;
 } pll_displayed_tree_t;
 
