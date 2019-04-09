@@ -31,7 +31,7 @@ pll_rnetwork_node_t * go_down_recursive(pll_rnetwork_node_t * node, int * presen
 	return node->right;
   }
 
-  if (rnetwork_can_go_tree(node, node->left, tree_number))
+  if (pll_rnetwork_can_go_tree(node, node->left, tree_number))
   {
 	pll_rnetwork_node_t * try_left = go_down_recursive(node->left, present, tree_number);
 	if (try_left)
@@ -39,7 +39,7 @@ pll_rnetwork_node_t * go_down_recursive(pll_rnetwork_node_t * node, int * presen
 	  return try_left;
 	}
   }
-  else if (rnetwork_can_go_tree(node, node->right, tree_number))
+  else if (pll_rnetwork_can_go_tree(node, node->right, tree_number))
   {
 	return go_down_recursive(node->right, present, tree_number);
   }
