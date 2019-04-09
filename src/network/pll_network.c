@@ -57,7 +57,7 @@ double collect_branch_length_to_first_present_parent(pll_rnetwork_node_t * node,
   return branch_sum;
 }
 
-PLL_EXPORT int pll_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result) {
+PLL_EXPORT int pllmod_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result) {
 	unsigned int nodes_count = network->reticulation_count + network->inner_tree_count + network->tip_count;
 	unsigned int inner_nodes_count = network->reticulation_count + network->inner_tree_count;
 	unsigned int branch_count = network->inner_tree_count * 2 + network->reticulation_count;
