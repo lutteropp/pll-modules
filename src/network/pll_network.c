@@ -6,40 +6,44 @@ int cb_full_traversal(pll_rnetwork_node_t * node) {
 	return 1;
 }
 
-pll_rnetwork_node_t * find_present_left_child(pll_rnetwork_node_t * node, int * present, uint64_t tree_number)
+pll_rnetwork_node_t * go_down_recursive(pll_rnetwork_node_t * node, int * present, uint64_t tree_number)
 {
-  pll_rnetwork_node_t* left = node->left;
-  while (!present[left->idx])
+  if (!node)
   {
-    // go down further
-	if (left->is_reticulation)
-	{
-	  left = left->child;
-	}
-	else
-	{ // inner tree node
-	  // TODO: we need to go further down... but which child to take?
-	}
+	return NULL;
   }
-  return left;
-}
+  if (node->is_reticulation)
+  {
+	return go_down_recursive(node->child, present, tree_number);
+  }
+  if (present[node->idx])
+  {
+  	return node;
+  }
 
-pll_rnetwork_node_t * find_present_right_child(pll_rnetwork_node_t * node, int * present, uint64_t tree_number)
-{
-  pll_rnetwork_node_t * right = node->right;
-  while (!present[right->idx])
+  // check left child and right child first
+  if (present[node->left->idx])
   {
-    // go down further
-    if (right->is_reticulation)
+	return node->left;
+  }
+  if (present[node->right->idx])
+  {
+	return node->right;
+  }
+
+  if (rnetwork_can_go_tree(node, node->left, tree_number))
+  {
+	pll_rnetwork_node_t * try_left = go_down_recursive(node->left, present, tree_number);
+	if (try_left)
 	{
-	  right = right->child;
-	}
-	else
-	{ // inner tree node
-	  // TODO: we need to go further down... but which child to take?
+	  return try_left;
 	}
   }
-  return right;
+  else if (rnetwork_can_go_tree(node, node->right, tree_number))
+  {
+	return go_down_recursive(node->right, present, tree_number);
+  }
+  return NULL; // we should never end up here though
 }
 
 double collect_branch_length_to_first_present_parent(pll_rnetwork_node_t * node, int * present)
@@ -105,8 +109,8 @@ PLL_EXPORT int pll_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64_t 
         // These values change! It could be that the child is not in the trav_buffer, in this case go down until a child has been found!
         // Keep in mind that only nodes with at most one non-dead child are thrown out from the trav_buffer, and dead nodes are thrown out, too
 
-        pll_rnetwork_node_t * left = find_present_left_child(node, present, tree_number);
-        pll_rnetwork_node_t * right = find_present_right_child(node, present, tree_number);
+        pll_rnetwork_node_t * left = go_down_recursive(node->left, present, tree_number);
+        pll_rnetwork_node_t * right = go_down_recursive(node->right, present, tree_number);
 
         result->operations[result->ops_count].child1_clv_index = left->idx;
         result->operations[result->ops_count].child1_scaler_index = left->scaler_idx;
