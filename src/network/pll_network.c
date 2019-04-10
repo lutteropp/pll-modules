@@ -46,13 +46,35 @@ pll_rnetwork_node_t * go_down_recursive(pll_rnetwork_node_t * node, int * presen
   return NULL; // we should never end up here though
 }
 
-double collect_branch_length_to_first_present_parent(pll_rnetwork_node_t * node, int * present)
+double collect_branch_length_to_first_present_parent(pll_rnetwork_node_t * node, int * present, uint64_t tree_number)
 {
-  double branch_sum = node->length;
-  while (!present[node->parent->idx])
+  if (node->is_reticulation)
   {
-	node = node->parent;
-	branch_sum += node->length;
+	return PLL_FAILURE; // this should not happen as reticulation nodes should not be in the post-order tree traversal.
+  }
+  double branch_sum = node->length;
+  pll_rnetwork_node_t* parent = node->parent;
+  while (!present[parent->idx])
+  {
+	node = parent;
+	if (node->is_reticulation)
+	{
+      if (pll_rnetwork_can_go_tree(node->first_parent, node, tree_number))
+      {
+    	branch_sum += node->first_parent_length;
+        parent = node->first_parent;
+      }
+      else
+      {
+    	branch_sum += node->second_parent_length;
+    	parent = node->second_parent;
+      }
+	}
+	else
+	{
+	  branch_sum += node->length;
+	  parent = node->parent;
+	}
   }
   return branch_sum;
 }
@@ -96,7 +118,7 @@ PLL_EXPORT int pllmod_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64
       /* do not store the branch of the root, since it does not exist */
       if (i < trav_size-1)
       {
-        *(result->branch_lengths)++ = collect_branch_length_to_first_present_parent(node, present);
+        *(result->branch_lengths)++ = collect_branch_length_to_first_present_parent(node, present, tree_number);
         *(result->pmatrix_indices)++ = node->idx;
         result->matrix_count = result->matrix_count + 1;
       }
