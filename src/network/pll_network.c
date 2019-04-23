@@ -1,7 +1,7 @@
 #include "pll_network.h"
 #include "../pllmod_common.h"
 
-int cb_full_traversal(pll_rnetwork_node_t * node) {
+int cb_full_network_traversal(pll_rnetwork_node_t * node) {
 	(void) node;
 	return 1;
 }
@@ -86,7 +86,7 @@ PLL_EXPORT int pllmod_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64
 
 	pll_rnetwork_node_t ** trav_buffer = (pll_rnetwork_node_t **) malloc(nodes_count * sizeof(pll_rnetwork_node_t *));
 	unsigned int trav_size;
-	if (!pll_rnetwork_tree_traverse(network, PLL_TREE_TRAVERSE_POSTORDER, cb_full_traversal, trav_buffer, &trav_size, tree_number)) {
+	if (!pll_rnetwork_tree_traverse(network, PLL_TREE_TRAVERSE_POSTORDER, cb_full_network_traversal, trav_buffer, &trav_size, tree_number)) {
 		return PLL_FAILURE;
 	}
 
@@ -147,4 +147,81 @@ PLL_EXPORT int pllmod_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64
     }
     free(present);
 	return PLL_SUCCESS;
+}
+
+PLL_EXPORT pll_rnetwork_t * pllmod_rnetwork_create_random(unsigned int taxa_count,
+                                                    const char * const* names,
+                                                    unsigned int random_seed) {
+	return PLL_FAILURE;
+}
+
+PLL_EXPORT int pllmod_rnetwork_extend_random(pll_rnetwork_t * network,
+                                          unsigned int ext_taxa_count,
+                                          const char * const* ext_names,
+                                          unsigned int random_seed) {
+	return PLL_FAILURE;
+}
+
+PLL_EXPORT
+pll_rnetwork_t * pllmod_rnetwork_create_parsimony(unsigned int taxon_count,
+                                            unsigned int seq_length,
+                                            char * const * names,
+                                            char * const * sequences,
+                                            const unsigned int * site_weights,
+                                            const pll_state_t * map,
+                                            unsigned int states,
+                                            unsigned int attributes,
+                                            unsigned int random_seed,
+                                            unsigned int * score) {
+	return PLL_FAILURE;
+}
+
+pll_rnetwork_t * pllmod_rnetwork_create_parsimony_multipart(unsigned int taxon_count,
+                                                      char * const * taxon_names,
+                                                      unsigned int partition_count,
+                                                      pll_partition_t * const * partitions,
+                                                      unsigned int random_seed,
+                                                      unsigned int * score) {
+	return PLL_FAILURE;
+}
+
+PLL_EXPORT pll_rnetwork_t * pllmod_rnetwork_resolve_multi(const pll_rnetwork_t * multi_network,
+                                                    unsigned int random_seed,
+                                                    int * clv_index_map) {
+	return PLL_FAILURE;
+}
+
+PLL_EXPORT int pllmod_rnetwork_is_tip(const pll_rnetwork_node_t * node)
+{
+  return (node->left == NULL && node->right == NULL && node->child == NULL);
+}
+
+PLL_EXPORT void pllmod_rnetwork_set_length(pll_rnetwork_node_t * edge,
+                                            double length)
+{
+  edge->length = length;
+}
+
+PLL_EXPORT void pllmod_rnetwork_set_length_recursive(pll_rnetwork_t * network,
+                                                  double length,
+                                                  int missing_only)
+{
+  /* set branch lengths */
+  unsigned int i;
+  unsigned int tip_count = network->tip_count;
+  unsigned int inner_count = network->inner_tree_count + network->reticulation_count;
+  for (i = 0; i < tip_count + inner_count; ++i)
+  {
+    pll_rnetwork_node_t * node = network->nodes[i];
+    if (!node->length || !missing_only)
+      pllmod_rnetwork_set_length(node, length);
+  }
+}
+
+PLL_EXPORT int pllmod_rnetwork_outgroup_root(pll_rnetwork_t * network,
+                                          unsigned int * outgroup_tip_ids,
+                                          unsigned int outgroup_size,
+                                          int add_root_node)
+{
+  return PLL_FAILURE;
 }

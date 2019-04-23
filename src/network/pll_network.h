@@ -230,4 +230,58 @@ PLL_EXPORT int pllmod_networkinfo_check_constraint(pllmod_networkinfo_t * networ
                                                 pll_rnetwork_node_t * subtree,
                                                 pll_rnetwork_node_t * regraft_edge);
 
+/* Network construction */
+/* functions at pll_network.c */
+
+PLL_EXPORT pll_rnetwork_t * pllmod_rnetwork_create_random(unsigned int taxa_count,
+                                                    const char * const* names,
+                                                    unsigned int random_seed);
+
+PLL_EXPORT int pllmod_rnetwork_extend_random(pll_rnetwork_t * network,
+                                          unsigned int ext_taxa_count,
+                                          const char * const* ext_names,
+                                          unsigned int random_seed);
+
+PLL_EXPORT
+pll_rnetwork_t * pllmod_rnetwork_create_parsimony(unsigned int taxon_count,
+                                            unsigned int seq_length,
+                                            char * const * names,
+                                            char * const * sequences,
+                                            const unsigned int * site_weights,
+                                            const pll_state_t * map,
+                                            unsigned int states,
+                                            unsigned int attributes,
+                                            unsigned int random_seed,
+                                            unsigned int * score);
+
+pll_rnetwork_t * pllmod_rnetwork_create_parsimony_multipart(unsigned int taxon_count,
+                                                      char * const * taxon_names,
+                                                      unsigned int partition_count,
+                                                      pll_partition_t * const * partitions,
+                                                      unsigned int random_seed,
+                                                      unsigned int * score);
+
+PLL_EXPORT pll_rnetwork_t * pllmod_rnetwork_resolve_multi(const pll_rnetwork_t * multi_network,
+                                                    unsigned int random_seed,
+                                                    int * clv_index_map);
+
+PLL_EXPORT int pllmod_rnetwork_is_tip(const pll_rnetwork_node_t * node);
+
+PLL_EXPORT void pllmod_rnetwork_set_length(pll_rnetwork_node_t * edge,
+                                     double length);
+
+PLL_EXPORT void pllmod_rnetwork_set_length_recursive(pll_rnetwork_t * network,
+                                                  double length,
+                                                  int missing_only);
+
+PLL_EXPORT int pllmod_rnetwork_outgroup_root(pll_rnetwork_t * network,
+                                          unsigned int * outgroup_tip_ids,
+                                          unsigned int outgroup_size,
+                                          int add_root_node);
+
+/* functions at rnetwork_operations.c */
+PLL_EXPORT int pllmod_rnetwork_connect_nodes(pll_rnetwork_node_t * parent,
+                                          pll_rnetwork_node_t * child,
+                                           double length, double prob);
+
 #endif /* PLL_NETWORK_H_ */
