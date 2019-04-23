@@ -134,7 +134,7 @@ PLL_EXPORT int pllmod_betworkinfo_destroy_partition(pllmod_networkinfo_t * netwo
 
 PLL_EXPORT void pllmod_networkinfo_destroy(pllmod_networkinfo_t * networkinfo)
 {
-  return PLL_FAILURE;
+  return;
 }
 
 PLL_EXPORT int pllmod_networkinfo_update_prob_matrices(pllmod_networkinfo_t * networkinfo,
@@ -145,7 +145,7 @@ PLL_EXPORT int pllmod_networkinfo_update_prob_matrices(pllmod_networkinfo_t * ne
 
 PLL_EXPORT void pllmod_networkinfo_invalidate_all(pllmod_networkinfo_t * networkinfo)
 {
-  return PLL_FAILURE;
+  return;
 }
 
 PLL_EXPORT int pllmod_networkinfo_validate_clvs(pllmod_networkinfo_t * networkinfo,
@@ -158,13 +158,13 @@ PLL_EXPORT int pllmod_networkinfo_validate_clvs(pllmod_networkinfo_t * networkin
 PLL_EXPORT void pllmod_networkinfo_invalidate_pmatrix(pllmod_networkinfo_t * networkinfo,
                                                    const pll_rnetwork_node_t * edge)
 {
-  return PLL_FAILURE;
+  return;
 }
 
 PLL_EXPORT void pllmod_networkinfo_invalidate_clv(pllmod_networkinfo_t * networkinfo,
                                                const pll_unode_t * edge)
 {
-  return PLL_FAILURE;
+  return;
 }
 
 PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo,
