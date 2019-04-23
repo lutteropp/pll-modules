@@ -21,9 +21,9 @@
 #ifndef PLL_ALGORITHM_H_
 #define PLL_ALGORITHM_H_
 
+#include "pll_network.h"
 #include "pll_optimize.h"
 #include "pll_tree.h"
-#include "pll_network.h"
 #include "pllmod_util.h"
 
 #define PLLMOD_ALGO_MIN_WEIGHT_RATIO 0.001
@@ -281,6 +281,19 @@ double pllmod_algo_opt_brlen_networkinfo(pllmod_networkinfo_t * networkinfo,
 /* search */
 
 PLL_EXPORT double pllmod_algo_spr_round(pllmod_treeinfo_t * treeinfo,
+                                        int radius_min,
+                                        int radius_max,
+                                        int n_topologies,
+                                        int thorough,
+                                        int brlen_opt_method,
+                                        double bl_min,
+                                        double bl_max,
+                                        int smoothings,
+                                        double epsilon,
+                                        cutoff_info_t * cutoff_info,
+                                        double subtree_cutoff);
+
+PLL_EXPORT double pllmod_algo_spr_round_networkinfo(pllmod_networkinfo_t * networkinfo,
                                         int radius_min,
                                         int radius_max,
                                         int n_topologies,

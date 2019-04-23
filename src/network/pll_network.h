@@ -65,11 +65,11 @@ typedef struct networkinfo
   int brlen_linkage;
   double * linked_branch_lengths;
 
-  pll_rnetwork_node_t * root;
-  pll_rnetwork_t * network;
+  pll_unetwork_node_t * root;
+  pll_unetwork_t * network;
 
   unsigned int subnode_count;
-  pll_rnetwork_node_t ** subnodes;
+  pll_unetwork_node_t ** subnodes;
 
   // partitions & partition-specific stuff
   pll_partition_t ** partitions;
@@ -116,7 +116,7 @@ typedef struct networkinfo
 
 /* networkinfo */
 
-PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_rnetwork_node_t * root,
+PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_unetwork_node_t * root,
                                                      unsigned int tips,
                                                      unsigned int partitions,
                                                      int brlen_linkage);
@@ -142,30 +142,30 @@ PLL_EXPORT int pllmod_networkinfo_set_active_partition(pllmod_networkinfo_t * ne
                                                     int partition_index);
 
 PLL_EXPORT int pllmod_networkinfo_set_root(pllmod_networkinfo_t * treeinfo,
-                                        pll_rnetwork_node_t * root);
+                                        pll_unetwork_node_t * root);
 
 PLL_EXPORT
 int pllmod_networkinfo_get_branch_length_all(const pllmod_networkinfo_t * treeinfo,
-                                          const pll_rnetwork_node_t * edge,
+                                          const pll_unetwork_node_t * edge,
                                           double * lengths);
 
 PLL_EXPORT int pllmod_networkinfo_set_branch_length(pllmod_networkinfo_t * networkinfo,
-                                                 pll_rnetwork_node_t * edge,
+                                                 pll_unetwork_node_t * edge,
                                                  double length);
 
 PLL_EXPORT
 int pllmod_networkinfo_set_branch_length_all(pllmod_networkinfo_t * networkinfo,
-                                          pll_rnetwork_node_t * edge,
+                                          pll_unetwork_node_t * edge,
                                           const double * lengths);
 
 PLL_EXPORT
 int pllmod_networkinfo_set_branch_length_partition(pllmod_networkinfo_t * networkinfo,
-                                                pll_rnetwork_node_t * edge,
+		                                        pll_unetwork_node_t * edge,
                                                 int partition_index,
                                                 double length);
 
 PLL_EXPORT
-pll_rnetwork_t * pllmod_networkinfo_get_partition_network(const pllmod_networkinfo_t * networkinfo,
+pll_unetwork_t * pllmod_networkinfo_get_partition_network(const pllmod_networkinfo_t * networkinfo,
                                                  int partition_index);
 
 PLL_EXPORT
@@ -190,14 +190,14 @@ PLL_EXPORT int pllmod_networkinfo_update_prob_matrices(pllmod_networkinfo_t * ne
 PLL_EXPORT void pllmod_networkinfo_invalidate_all(pllmod_networkinfo_t * networkinfo);
 
 PLL_EXPORT int pllmod_networkinfo_validate_clvs(pllmod_networkinfo_t * networkinfo,
-                                             pll_rnetwork_node_t ** travbuffer,
+		                                     pll_unetwork_node_t ** travbuffer,
                                              unsigned int travbuffer_size);
 
 PLL_EXPORT void pllmod_networkinfo_invalidate_pmatrix(pllmod_networkinfo_t * networkinfo,
-                                                   const pll_rnetwork_node_t * edge);
+                                                   const pll_unetwork_node_t * edge);
 
 PLL_EXPORT void pllmod_networkinfo_invalidate_clv(pllmod_networkinfo_t * networkinfo,
-                                               const pll_unode_t * edge);
+                                               const pll_unetwork_node_t * edge);
 
 PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo,
                                                 int incremental);
@@ -218,20 +218,20 @@ PLL_EXPORT
 int pllmod_networkinfo_normalize_brlen_scalers(pllmod_networkinfo_t * networkinfo);
 
 PLL_EXPORT int pllmod_networkinfo_set_network(pllmod_networkinfo_t * networkinfo,
-                                        pll_rnetwork_t * network);
+                                        pll_unetwork_t * network);
 
 PLL_EXPORT int pllmod_networkinfo_set_constraint_clvmap(pllmod_networkinfo_t * networkinfo,
                                                      const int * clv_index_map);
 
 PLL_EXPORT int pllmod_networkinfo_set_constraint_network(pllmod_networkinfo_t * networkinfo,
-                                                   const pll_rnetwork_t * cons_network);
+                                                   const pll_unetwork_t * cons_network);
 
 PLL_EXPORT int pllmod_networkinfo_check_constraint(pllmod_networkinfo_t * networkinfo,
-                                                pll_rnetwork_node_t * subtree,
-                                                pll_rnetwork_node_t * regraft_edge);
+		                                          pll_unetwork_node_t * subnetwork,
+		                                          pll_unetwork_node_t * regraft_edge);
 
 /* Network construction */
-/* functions at pll_network.c */
+/* functions at pll_rnetwork.c */
 
 PLL_EXPORT pll_rnetwork_t * pllmod_rnetwork_create_random(unsigned int taxa_count,
                                                     const char * const* names,
@@ -282,6 +282,60 @@ PLL_EXPORT int pllmod_rnetwork_outgroup_root(pll_rnetwork_t * network,
 /* functions at rnetwork_operations.c */
 PLL_EXPORT int pllmod_rnetwork_connect_nodes(pll_rnetwork_node_t * parent,
                                           pll_rnetwork_node_t * child,
+                                           double length, double prob);
+
+/* Network construction */
+/* functions at pll_unetwork.c */
+
+PLL_EXPORT pll_unetwork_t * pllmod_unetwork_create_random(unsigned int taxa_count,
+                                                    const char * const* names,
+                                                    unsigned int random_seed);
+
+PLL_EXPORT int pllmod_unetwork_extend_random(pll_unetwork_t * network,
+                                          unsigned int ext_taxa_count,
+                                          const char * const* ext_names,
+                                          unsigned int random_seed);
+
+PLL_EXPORT
+pll_unetwork_t * pllmod_unetwork_create_parsimony(unsigned int taxon_count,
+                                            unsigned int seq_length,
+                                            char * const * names,
+                                            char * const * sequences,
+                                            const unsigned int * site_weights,
+                                            const pll_state_t * map,
+                                            unsigned int states,
+                                            unsigned int attributes,
+                                            unsigned int random_seed,
+                                            unsigned int * score);
+
+pll_unetwork_t * pllmod_unetwork_create_parsimony_multipart(unsigned int taxon_count,
+                                                      char * const * taxon_names,
+                                                      unsigned int partition_count,
+                                                      pll_partition_t * const * partitions,
+                                                      unsigned int random_seed,
+                                                      unsigned int * score);
+
+PLL_EXPORT pll_unetwork_t * pllmod_unetwork_resolve_multi(const pll_unetwork_t * multi_network,
+                                                    unsigned int random_seed,
+                                                    int * clv_index_map);
+
+PLL_EXPORT int pllmod_unetwork_is_tip(const pll_unetwork_node_t * node);
+
+PLL_EXPORT void pllmod_unetwork_set_length(pll_unetwork_node_t * edge,
+                                     double length);
+
+PLL_EXPORT void pllmod_unetwork_set_length_recursive(pll_unetwork_t * network,
+                                                  double length,
+                                                  int missing_only);
+
+PLL_EXPORT int pllmod_unetwork_outgroup_root(pll_unetwork_t * network,
+                                          unsigned int * outgroup_tip_ids,
+                                          unsigned int outgroup_size,
+                                          int add_root_node);
+
+/* functions at unetwork_operations.c */
+PLL_EXPORT int pllmod_unetwork_connect_nodes(pll_unetwork_node_t * parent,
+                                          pll_unetwork_node_t * child,
                                            double length, double prob);
 
 #endif /* PLL_NETWORK_H_ */

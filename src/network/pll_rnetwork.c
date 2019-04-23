@@ -1,4 +1,5 @@
 #include "pll_network.h"
+
 #include "../pllmod_common.h"
 
 int cb_full_network_traversal(pll_rnetwork_node_t * node) {
@@ -126,7 +127,7 @@ PLL_EXPORT int pllmod_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64
       if (node->left) // inner tree node
       {
         result->operations[result->ops_count].parent_clv_index = node->idx;
-        result->operations[result->ops_count].parent_scaler_index = node->scaler_idx;
+        result->operations[result->ops_count].parent_scaler_index = node->scaler_index;
 
         // These values change! It could be that the child is not in the trav_buffer, in this case go down until a child has been found!
         // Keep in mind that only nodes with at most one non-dead child are thrown out from the trav_buffer, and dead nodes are thrown out, too
@@ -135,11 +136,11 @@ PLL_EXPORT int pllmod_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64
         pll_rnetwork_node_t * right = go_down_recursive(node->right, present, tree_number);
 
         result->operations[result->ops_count].child1_clv_index = left->idx;
-        result->operations[result->ops_count].child1_scaler_index = left->scaler_idx;
+        result->operations[result->ops_count].child1_scaler_index = left->scaler_index;
         result->operations[result->ops_count].child1_matrix_index = left->idx;
 
         result->operations[result->ops_count].child2_clv_index = right->idx;
-        result->operations[result->ops_count].child2_scaler_index = right->scaler_idx;
+        result->operations[result->ops_count].child2_scaler_index = right->scaler_index;
         result->operations[result->ops_count].child2_matrix_index = right->idx;
 
         result->ops_count = result->ops_count + 1;

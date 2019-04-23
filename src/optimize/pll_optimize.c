@@ -767,6 +767,35 @@ static void update_partials_and_scalers(pll_partition_t ** partitions,
   }
 }
 
+static void update_partials_and_scalers_network(pll_partition_t ** partitions,
+                                        size_t partition_count,
+                                        pll_unetwork_node_t * parent,
+                                        pll_unetwork_node_t * right_child,
+                                        pll_unetwork_node_t * left_child)
+{
+  pll_operation_t op;
+  size_t p;
+
+  /* set CLV */
+  op.parent_clv_index    = parent->clv_index;
+  op.parent_scaler_index = parent->scaler_index;
+  op.child1_clv_index    = right_child->back->clv_index;
+  op.child1_matrix_index = right_child->back->pmatrix_index;
+  op.child1_scaler_index = right_child->back->scaler_index;
+  op.child2_clv_index    = left_child->back->clv_index;
+  op.child2_matrix_index = left_child->back->pmatrix_index;
+  op.child2_scaler_index = left_child->back->scaler_index;
+
+  for (p = 0; p < partition_count; ++p)
+  {
+    /* skip remote partitions */
+    if (!partitions[p])
+      continue;
+
+    pll_update_partials (partitions[p], &op, 1);
+  }
+}
+
 /* if keep_update, P-matrices are updated after each branch length opt */
 static int recomp_iterative (pll_newton_tree_params_t * params,
                               int radius,
@@ -1316,7 +1345,7 @@ static void update_prob_matrices_network(pll_partition_t ** partitions,
                                  unsigned int ** params_indices,
                                  double ** brlen_buffers,
                                  double * brlen_scalers,
-                                 pll_rnetwork_node_t * node)
+                                 pll_unetwork_node_t * node)
 {
   unsigned int p;
   unsigned int m = node->pmatrix_index;
@@ -1340,6 +1369,76 @@ static void update_prob_matrices_network(pll_partition_t ** partitions,
 }
 
 static int allocate_buffers(pll_newton_tree_params_multi_t * params)
+{
+  if (!params->precomp_buffers)
+  {
+    params->precomp_buffers =  (double **) calloc(params->partition_count,
+                                                  sizeof(double *));
+    if (!params->precomp_buffers)
+      return PLL_FAILURE;
+
+    for (unsigned int p = 0; p < params->partition_count; ++p)
+    {
+      const pll_partition_t * partition = params->partitions[p];
+
+      /* skip remote partitions */
+      if (!partition)
+        continue;
+
+      unsigned int sites_alloc = partition->sites;
+      if (partition->attributes & PLL_ATTRIB_AB_FLAG)
+        sites_alloc += partition->states;
+
+      params->precomp_buffers[p] = (double *) pll_aligned_alloc(
+                 sites_alloc * partition->rate_cats * partition->states_padded *
+                 sizeof(double), partition->alignment);
+
+      if (!params->precomp_buffers[p])
+        return PLL_FAILURE;
+    }
+  }
+
+  if (!params->brlen_buffers && params->opt_method == PLLMOD_OPT_BLO_NEWTON_FALLBACK)
+  {
+    params->brlen_buffers =  (double **) calloc(params->partition_count,
+                                                sizeof(double *));
+    if (!params->brlen_buffers)
+      return PLL_FAILURE;
+
+    // not very elegant...
+    unsigned int branch_count = 0;
+    for (size_t p = 0; p < params->partition_count; ++p)
+    {
+      if (params->partitions[p])
+      {
+        branch_count = 2 * params->partitions[p]->tips - 3;
+        break;
+      }
+    }
+    assert(branch_count);
+
+    assert(params->brlen_linkage != PLLMOD_COMMON_BRLEN_UNLINKED);
+
+    params->brlen_buffers[0] = (double *) calloc(branch_count,
+        sizeof(double));
+
+    if (!params->brlen_buffers[0])
+      return PLL_FAILURE;
+  }
+
+  if (params->brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
+  {
+    params->converged = (int *) calloc(params->partition_count, sizeof(int));
+    params->brlen_orig = (double *) calloc(params->partition_count, sizeof(double));
+    params->brlen_guess = (double *) calloc(params->partition_count, sizeof(double));
+    if (!params->converged || !params->brlen_orig || !params->brlen_guess)
+      return PLL_FAILURE;
+  }
+
+  return PLL_SUCCESS;
+}
+
+static int allocate_buffers_network(pll_newton_network_params_multi_t * params)
 {
   if (!params->precomp_buffers)
   {
@@ -1723,6 +1822,320 @@ static int recomp_iterative_multi(pll_newton_tree_params_multi_t * params,
 
 } /* recomp_iterative */
 
+/* if keep_update, P-matrices are updated after each branch length opt */
+static int recomp_iterative_multi_network(pll_newton_network_params_multi_t * params,
+                                  int radius,
+                                  double * loglikelihood_score,
+                                  int keep_update)
+{
+  pll_unetwork_node_t *tr_p, *tr_q, *tr_z;
+  unsigned int p;
+  int retval;
+  unsigned int xnum;
+  double xmin,          /* min branch length */
+         xorig_linked,  /* original branch length before optimization (linked) */
+         xguess_linked, /* initial guess (linked) */
+         xmax,          /* max branch length */
+         xtol;          /* tolerance */
+
+  double *xorig,        /* original branch length before optimization */
+         *xguess;       /* initial guess / current branch length value */
+
+  unsigned int pmatrix_index;
+
+  int unlinked      = params->brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED ? 1 : 0;
+  int apply_change  = 0;
+
+  tr_p = params->network;
+  tr_q = params->network->next;
+  tr_z = tr_q ? tr_q->next : NULL;
+  pmatrix_index = tr_p->pmatrix_index;
+
+  if (unlinked)
+  {
+    assert(params->brlen_buffers && params->brlen_orig && params->brlen_guess);
+    xnum = params->partition_count;
+    xorig = params->brlen_orig;
+    xguess = params->brlen_guess;
+
+    /* set initial values */
+    for (p = 0; p < xnum; ++p)
+    {
+      xguess[p] = params->partitions[p] ?
+          params->brlen_buffers[p][pmatrix_index] : 0.0;
+    }
+
+    /* make sure every thread has all per-partition branch lengths */
+    if (xnum > 1 && params->parallel_reduce_cb)
+    {
+      params->parallel_reduce_cb(params->parallel_context, xguess, xnum,
+                                 PLLMOD_COMMON_REDUCE_MAX);
+    }
+
+    memcpy(xorig, xguess, xnum * sizeof(double));
+  }
+  else
+  {
+    xnum = 1;
+    xorig = &xorig_linked;
+    xguess = &xguess_linked;
+    *xorig = *xguess = tr_p->length;
+  }
+
+  /* reset convergence flags */
+  if (params->converged)
+    memset(params->converged, 0, xnum * sizeof(int));
+
+  /* check branch length integrity */
+  assert(d_equals(tr_p->length, tr_p->back->length));
+
+  /* prepare sumtable for current branch */
+  for (p = 0; p < params->partition_count; ++p)
+  {
+    /* skip remote partitions */
+    if (!params->partitions[p])
+      continue;
+
+    pll_update_sumtable (params->partitions[p],
+                         tr_p->clv_index,
+                         tr_p->back->clv_index,
+                         tr_p->scaler_index,
+                         tr_p->back->scaler_index,
+                         params->params_indices[p],
+                         params->precomp_buffers[p]);
+  }
+
+  /* set N-R parameters */
+  xmin = params->branch_length_min;
+  xmax = params->branch_length_max;
+  xtol = params->tolerance;
+
+  switch (params->opt_method)
+  {
+    case PLLMOD_OPT_BLO_NEWTON_FAST:
+    case PLLMOD_OPT_BLO_NEWTON_SAFE:
+    {
+      retval = pllmod_opt_minimize_newton_multi(xnum,
+                                                xmin, xguess, xmax, xtol,
+                                                params->max_newton_iters,
+                                                params->converged,
+                                                params,
+                                                utree_derivative_func_multi);
+    }
+    break;
+    case PLLMOD_OPT_BLO_NEWTON_FALLBACK:
+      // TODO: adapt for unlinked branches
+      params->brlen_buffers[0][tr_p->pmatrix_index] = tr_p->length;
+      retval = PLL_FAILURE;
+      assert(0);
+      break;
+    case PLLMOD_OPT_BLO_NEWTON_OLDFAST:
+    case PLLMOD_OPT_BLO_NEWTON_OLDSAFE:
+    {
+      assert(!unlinked);
+      xguess[0] = pllmod_opt_minimize_newton_old(xmin, xguess[0], xmax, xtol,
+                                         params->max_newton_iters, params,
+                                         utree_derivative_func_multi_old);
+      retval = pll_errno ? PLL_FAILURE : PLL_SUCCESS;
+    }
+    break;
+    case PLLMOD_OPT_BLO_NEWTON_GLOBAL:
+    {
+      retval = PLL_FAILURE;
+      assert(0);
+    }
+    break;
+    default:
+      retval = PLL_FAILURE;
+      assert(0);
+  }
+
+  if (!retval)
+  {
+    if (pll_errno == PLLMOD_OPT_ERROR_NEWTON_LIMIT)
+    {
+      /* NR optimization failed to converge:
+       * - if LH improvement check is enabled, it is safe to keep
+       *   the branch length from the last iteration
+       * - otherwise, we must reset branch length to the original value
+       *   to avoid getting worse LH score in the end
+       * */
+
+      for (p = 0; p < xnum; ++p)
+      {
+        // NR converged for this partition -> skip it
+        if (params->converged && params->converged[p])
+          continue;
+
+        DBG("[%u] NR failed to converge after %u iterations: branch %3d - %3d "
+            "(old: %.12f, new: %.12f)\n",
+            p, params->max_newton_iters, tr_p->clv_index, tr_p->back->clv_index,
+            xorig[p], xguess[p]);
+
+        if (!check_loglh_improvement(params->opt_method))
+          xguess[p] = xorig[p];
+      }
+
+      pllmod_reset_error();
+    }
+    else
+      return PLL_FAILURE;
+  }
+
+  /* update branch length in the buffer and/or in the tree structure */
+  for (p = 0; p < xnum; ++p)
+  {
+    assert(xguess[p] >= xmin && xguess[p] <= xmax);
+
+    // ignore small changes in BL
+    if (fabs(xguess[p] - xorig[p]) < 1e-10)
+      continue;
+
+    apply_change = 1;
+    if (params->brlen_buffers[p])
+      params->brlen_buffers[p][pmatrix_index] = xguess[p];
+  }
+
+  if (apply_change)
+  {
+    if (!unlinked)
+      tr_p->length = tr_p->back->length = xguess[0];
+
+    /* update pmatrix for the new branch length */
+    if (keep_update)
+    {
+      update_prob_matrices_network(params->partitions, params->partition_count,
+                           params->params_indices,
+                           params->brlen_buffers, params->brlen_scalers, tr_p);
+    }
+
+    if (check_loglh_improvement(params->opt_method))
+    {
+      assert(keep_update);
+
+      /* check and compare likelihood */
+      double eval_loglikelihood = pllmod_opt_compute_edge_loglikelihood_multi(
+                                                        params->partitions,
+                                                        params->partition_count,
+                                                        tr_p->clv_index,
+                                                        tr_p->scaler_index,
+                                                        tr_p->back->clv_index,
+                                                        tr_p->back->scaler_index,
+                                                        tr_p->pmatrix_index,
+                                                        params->params_indices,
+                                                        NULL,
+                                                        params->parallel_context,
+                                                        params->parallel_reduce_cb);
+
+      /* check if the optimal found value improves the likelihood score */
+      if (eval_loglikelihood >= *loglikelihood_score)
+      {
+        DBG("ACCEPT: new BL: %.12lf, old BL: %.12lf, new LH: %.9lf, old LH: %.9lf\n",
+               xguess[0], xorig[0], eval_loglikelihood, *loglikelihood_score);
+
+        /* fix new score */
+        *loglikelihood_score = eval_loglikelihood;
+      }
+      else
+      {
+        DBG("REVERT: new BL: %.12lf, old BL: %.12lf, new LH: %.9lf, old LH: %.9lf\n",
+            xguess[0], xorig[0], eval_loglikelihood, *loglikelihood_score);
+
+        /* reset branch length */
+        for (p = 0; p < xnum; ++p)
+        {
+          if (params->brlen_buffers[p])
+            params->brlen_buffers[p][pmatrix_index] = xorig[p];
+        }
+        if (!unlinked)
+          tr_p->length = tr_p->back->length = xorig[0];
+
+        update_prob_matrices_network(params->partitions, params->partition_count,
+                             params->params_indices,
+                             params->brlen_buffers, params->brlen_scalers, tr_p);
+      }
+    }
+  }
+
+#ifdef DEBUG
+  {
+    assert(!unlinked);
+    DBG(" Optimized branch %3d - %3d (%.12f -> %.12f)\n",
+        tr_p->clv_index, tr_p->back->clv_index, xorig[0], tr_p->length);
+
+    double new_loglh = pllmod_opt_compute_edge_loglikelihood_multi(
+                                                      params->partitions,
+                                                      params->partition_count,
+                                                      tr_p->clv_index,
+                                                      tr_p->scaler_index,
+                                                      tr_p->back->clv_index,
+                                                      tr_p->back->scaler_index,
+                                                      tr_p->pmatrix_index,
+                                                      params->params_indices,
+                                                      NULL,
+                                                      params->parallel_context,
+                                                      params->parallel_reduce_cb);
+
+    DBG(" New loglH: %.12f\n", new_loglh);
+  }
+#endif
+
+  /* update children */
+  if (radius && tr_q && tr_z)
+  {
+    /* update children 'Q'
+     * CLV at P is recomputed with children P->back and Z->back
+     * Scaler is updated by subtracting Q->back and adding P->back
+     */
+    update_partials_and_scalers_network(params->partitions,
+                                params->partition_count,
+                                tr_q,
+                                tr_p,
+                                tr_z);
+
+    /* eval */
+    pll_newton_network_params_multi_t params_cpy;
+    memcpy(&params_cpy, params, sizeof(pll_newton_network_params_multi_t));
+    params_cpy.network = tr_q->back;
+    if (!recomp_iterative_multi_network (&params_cpy,
+                           radius-1,
+                           loglikelihood_score,
+                           keep_update))
+      return PLL_FAILURE;
+
+    /* update children 'Z'
+     * CLV at P is recomputed with children P->back and Q->back
+     * Scaler is updated by subtracting Z->back and adding Q->back
+     */
+    update_partials_and_scalers_network(params->partitions,
+                                params->partition_count,
+                                tr_z,
+                                tr_q,
+                                tr_p);
+
+   /* eval */
+    params_cpy.network = tr_z->back;
+    if (!recomp_iterative_multi_network (&params_cpy,
+                           radius-1,
+                           loglikelihood_score,
+                           keep_update))
+      return PLL_FAILURE;
+
+    /* reset to initial state
+     * CLV at P is recomputed with children Q->back and Z->back
+     * Scaler is updated by subtracting P->back and adding Z->back
+     */
+    update_partials_and_scalers_network(params->partitions,
+                                params->partition_count,
+                                tr_p,
+                                tr_z,
+                                tr_q);
+  }
+
+  return PLL_SUCCESS;
+
+} /* recomp_iterative */
+
 /**
  * Optimize branch lengths locally around a given edge using Newton-Raphson
  * minimization algorithm on a multiple partition.
@@ -1990,7 +2403,7 @@ cleanup:
 PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi_network (
                                               pll_partition_t ** partitions,
                                               size_t partition_count,
-                                              pll_rnetwork_node_t * network,
+                                              pll_unetwork_node_t * network,
                                               unsigned int ** params_indices,
                                               double ** precomp_buffers,
                                               double ** brlen_buffers,
@@ -2090,7 +2503,7 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi_network (
   params.parallel_reduce_cb = parallel_reduce_cb;
 
   /* allocate the sumtable if needed */
-  if (!allocate_buffers(&params))
+  if (!allocate_buffers_network(&params))
   {
     pllmod_set_error(PLL_ERROR_MEM_ALLOC,
                      "Cannot allocate memory for brlen opt variables");
@@ -2104,7 +2517,7 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi_network (
 
     /* iterate on first edge */
     params.network = network;
-    if (!recomp_iterative_multi (&params, radius, &new_loglikelihood, keep_update))
+    if (!recomp_iterative_multi_network (&params, radius, &new_loglikelihood, keep_update))
     {
       assert(pll_errno);
       goto cleanup;
@@ -2114,7 +2527,7 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi_network (
     {
       /* iterate on second edge */
       params.network = network->back;
-      if (!recomp_iterative_multi (&params, radius-1, &new_loglikelihood, keep_update))
+      if (!recomp_iterative_multi_network (&params, radius-1, &new_loglikelihood, keep_update))
       {
         assert(pll_errno);
         goto cleanup;

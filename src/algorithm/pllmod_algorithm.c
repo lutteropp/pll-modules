@@ -1251,7 +1251,7 @@ double pllmod_algo_opt_brlen_scalers_networkinfo(pllmod_networkinfo_t * networki
   int brlen_fixed = 0;
   for (i = 0; i < networkinfo->subnode_count; ++i)
   {
-    pll_rnetwork_node_t * snode = networkinfo->subnodes[i];
+    pll_unetwork_node_t * snode = networkinfo->subnodes[i];
     if (snode->length < min_brlen)
     {
       pllmod_networkinfo_set_branch_length(networkinfo, snode, min_brlen);
@@ -1280,7 +1280,7 @@ double pllmod_algo_opt_brlen_scalers_networkinfo(pllmod_networkinfo_t * networki
       /* restore branch lengths */
       for (i = 0; i < networkinfo->subnode_count; ++i)
       {
-        pll_rnetwork_node_t * snode = networkinfo->subnodes[i];
+        pll_unetwork_node_t * snode = networkinfo->subnodes[i];
         //if (snode->node_index < snode->back->node_index)
         //{
           pllmod_networkinfo_set_branch_length(networkinfo, snode,

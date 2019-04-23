@@ -19,12 +19,11 @@
     Schloss-Wolfsbrunnenweg 35, D-69118 Heidelberg, Germany
 */
 
+#include "../pllmod_common.h"
 #include "pll_network.h"
 
-#include "../pllmod_common.h"
 
-
-PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_rnetwork_node_t * root,
+PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_unetwork_node_t * root,
                                                      unsigned int tips,
                                                      unsigned int partitions,
                                                      int brlen_linkage)
@@ -62,21 +61,21 @@ PLL_EXPORT int pllmod_networkinfo_set_active_partition(pllmod_networkinfo_t * ne
 }
 
 PLL_EXPORT int pllmod_networkinfo_set_root(pllmod_networkinfo_t * networkinfo,
-                                        pll_rnetwork_node_t * root)
+		                                   pll_unetwork_node_t * root)
 {
   return PLL_FAILURE;
 }
 
 PLL_EXPORT
 int pllmod_networkinfo_get_branch_length_all(const pllmod_networkinfo_t * networkinfo,
-                                          const pll_rnetwork_node_t * edge,
+                                          const pll_unetwork_node_t * edge,
                                           double * lengths)
 {
   return PLL_FAILURE;
 }
 
 PLL_EXPORT int pllmod_networkinfo_set_branch_length(pllmod_networkinfo_t * networkinfo,
-                                                 pll_rnetwork_node_t * edge,
+		                                         pll_unetwork_node_t * edge,
                                                  double length)
 {
   return PLL_FAILURE;
@@ -84,7 +83,7 @@ PLL_EXPORT int pllmod_networkinfo_set_branch_length(pllmod_networkinfo_t * netwo
 
 PLL_EXPORT
 int pllmod_networkinfo_set_branch_length_all(pllmod_networkinfo_t * networkinfo,
-                                          pll_rnetwork_node_t * edge,
+		                                  pll_unetwork_node_t * edge,
                                           const double * lengths)
 {
   return PLL_FAILURE;
@@ -92,7 +91,7 @@ int pllmod_networkinfo_set_branch_length_all(pllmod_networkinfo_t * networkinfo,
 
 PLL_EXPORT
 int pllmod_networkinfo_set_branch_length_partition(pllmod_networkinfo_t * networkinfo,
-                                                pll_rnetwork_node_t * edge,
+		                                        pll_unetwork_node_t * edge,
                                                 int partition_index,
                                                 double length)
 {
@@ -100,7 +99,7 @@ int pllmod_networkinfo_set_branch_length_partition(pllmod_networkinfo_t * networ
 }
 
 PLL_EXPORT
-pll_rnetwork_t * pllmod_networkinfo_get_partition_network(const pllmod_networkinfo_t * networkinfo,
+pll_unetwork_t * pllmod_networkinfo_get_partition_network(const pllmod_networkinfo_t * networkinfo,
                                                  int partition_index)
 {
   return PLL_FAILURE;
@@ -149,20 +148,20 @@ PLL_EXPORT void pllmod_networkinfo_invalidate_all(pllmod_networkinfo_t * network
 }
 
 PLL_EXPORT int pllmod_networkinfo_validate_clvs(pllmod_networkinfo_t * networkinfo,
-                                             pll_rnetwork_node_t ** travbuffer,
+		                                     pll_unetwork_node_t ** travbuffer,
                                              unsigned int travbuffer_size)
 {
   return PLL_FAILURE;
 }
 
 PLL_EXPORT void pllmod_networkinfo_invalidate_pmatrix(pllmod_networkinfo_t * networkinfo,
-                                                   const pll_rnetwork_node_t * edge)
+                                                   const pll_unetwork_node_t * edge)
 {
   return;
 }
 
 PLL_EXPORT void pllmod_networkinfo_invalidate_clv(pllmod_networkinfo_t * networkinfo,
-                                               const pll_unode_t * edge)
+                                               const pll_unetwork_node_t * edge)
 {
   return;
 }
@@ -201,7 +200,7 @@ int pllmod_networkinfo_normalize_brlen_scalers(pllmod_networkinfo_t * networkinf
 }
 
 PLL_EXPORT int pllmod_networkinfo_set_network(pllmod_networkinfo_t * networkinfo,
-                                        pll_rnetwork_t * network)
+                                        pll_unetwork_t * network)
 {
   return PLL_FAILURE;
 }
@@ -213,14 +212,14 @@ PLL_EXPORT int pllmod_networkinfo_set_constraint_clvmap(pllmod_networkinfo_t * n
 }
 
 PLL_EXPORT int pllmod_networkinfo_set_constraint_network(pllmod_networkinfo_t * networkinfo,
-                                                   const pll_rnetwork_t * cons_network)
+                                                   const pll_unetwork_t * cons_network)
 {
   return PLL_FAILURE;
 }
 
 PLL_EXPORT int pllmod_networkinfo_check_constraint(pllmod_networkinfo_t * networkinfo,
-                                                pll_rnetwork_node_t * subnetwork,
-                                                pll_rnetwork_node_t * regraft_edge)
+		                                        pll_unetwork_node_t * subnetwork,
+												pll_unetwork_node_t * regraft_edge)
 {
   return PLL_FAILURE;
 }

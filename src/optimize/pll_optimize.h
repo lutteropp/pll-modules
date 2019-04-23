@@ -161,6 +161,21 @@ typedef struct
   int opt_method;          /* see PLLMOD_OPT_BLO_* constants above */
 } pll_newton_tree_params_t;
 
+/* Custom parameters structure provided by PLL for the
+ * high level optimization functions (Newton-Raphson). */
+ typedef struct
+{
+  pll_partition_t * partition;
+  pll_unetwork_node_t * network;
+  const unsigned int * params_indices;
+  double * sumtable;
+  double branch_length_min;
+  double branch_length_max;
+  double tolerance;
+  int max_newton_iters;
+  int opt_method;          /* see PLLMOD_OPT_BLO_* constants above */
+} pll_newton_network_params_t;
+
 typedef struct
 {
   pll_unode_t * tree;
@@ -185,6 +200,32 @@ typedef struct
                              size_t,
                              int);
 } pll_newton_tree_params_multi_t;
+
+typedef struct
+{
+  pll_unetwork_node_t * network;
+  size_t partition_count;
+  pll_partition_t ** partitions;
+  unsigned int ** params_indices;
+  double ** precomp_buffers;
+  double ** brlen_buffers;
+  double * brlen_orig;
+  double * brlen_guess;
+  int * converged;
+  double * brlen_scalers;
+  double branch_length_min;
+  double branch_length_max;
+  double tolerance;
+  int max_newton_iters;
+  int opt_method;          /* see PLLMOD_OPT_BLO_* constants above */
+  int brlen_linkage;
+  void * parallel_context;
+  void (*parallel_reduce_cb)(void *,
+                             double *,
+                             size_t,
+                             int);
+} pll_newton_network_params_multi_t;
+
 
 /******************************************************************************/
 
@@ -305,6 +346,28 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi (
                                               pll_unode_t * tree,
                                               unsigned int ** params_indices,
                                               double ** sumtable_buffers,
+                                              double ** brlen_buffers,
+                                              double * brlen_scalers,
+                                              double branch_length_min,
+                                              double branch_length_max,
+                                              double lh_epsilon,
+                                              int max_iters,
+                                              int radius,
+                                              int keep_update,
+                                              int opt_method,
+                                              int brlen_linkage,
+                                              void * parallel_context,
+                                              void (*parallel_reduce_cb)(void *,
+                                                                         double *,
+                                                                         size_t,
+                                                                         int));
+
+PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi_network (
+                                              pll_partition_t ** partitions,
+                                              size_t partition_count,
+                                              pll_unetwork_node_t * network,
+                                              unsigned int ** params_indices,
+                                              double ** precomp_buffers,
                                               double ** brlen_buffers,
                                               double * brlen_scalers,
                                               double branch_length_min,
