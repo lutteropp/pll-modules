@@ -9,6 +9,7 @@ target_include_directories(pllmodalgorithm_obj PRIVATE ${PLLMOD_INCLUDE_PATH}
   ${CMAKE_CURRENT_SOURCE_DIR}/../msa
   ${CMAKE_CURRENT_SOURCE_DIR}/../optimize
   ${CMAKE_CURRENT_SOURCE_DIR}/../tree
+  ${CMAKE_CURRENT_SOURCE_DIR}/../network
   ${CMAKE_CURRENT_SOURCE_DIR}/../util
   )
 

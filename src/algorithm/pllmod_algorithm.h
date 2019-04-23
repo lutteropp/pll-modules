@@ -23,6 +23,7 @@
 
 #include "pll_optimize.h"
 #include "pll_tree.h"
+#include "pll_network.h"
 #include "pllmod_util.h"
 
 #define PLLMOD_ALGO_MIN_WEIGHT_RATIO 0.001
@@ -52,6 +53,16 @@ typedef int (*treeinfo_param_set_cb)(pllmod_treeinfo_t * treeinfo,
                                      unsigned int param_count);
 
 typedef int (*treeinfo_param_get_cb)(const pllmod_treeinfo_t * treeinfo,
+                                     unsigned int  part_num,
+                                     double * param_vals,
+                                     unsigned int param_count);
+
+typedef int (*networkinfo_param_set_cb)(pllmod_networkinfo_t * networkinfo,
+                                     unsigned int  part_num,
+                                     const double * param_vals,
+                                     unsigned int param_count);
+
+typedef int (*networkinfo_param_get_cb)(const pllmod_networkinfo_t * networkinfo,
                                      unsigned int  part_num,
                                      double * param_vals,
                                      unsigned int param_count);
@@ -192,6 +203,74 @@ double pllmod_algo_opt_brlen_scalers_treeinfo(pllmod_treeinfo_t * treeinfo,
 
 PLL_EXPORT
 double pllmod_algo_opt_brlen_treeinfo(pllmod_treeinfo_t * treeinfo,
+                                      double min_brlen,
+                                      double max_brlen,
+                                      double lh_epsilon,
+                                      int max_iters,
+                                      int opt_method,
+                                      int radius);
+
+/* functions to optimize multiple partitions in parallel, using networkinfo struct */
+
+PLL_EXPORT double pllmod_algo_opt_onedim_networkinfo(pllmod_networkinfo_t * networkinfo,
+                                                  int param_to_optimize,
+                                                  double min_value,
+                                                  double max_value,
+                                                  double tolerance);
+
+PLL_EXPORT
+double pllmod_algo_opt_onedim_networkinfo_custom(pllmod_networkinfo_t * networkinfo,
+                                              int param_to_optimize,
+                                              networkinfo_param_get_cb params_getter,
+                                              networkinfo_param_set_cb params_setter,
+                                              double min_value,
+                                              double max_value,
+                                              double tolerance);
+
+PLL_EXPORT
+double pllmod_algo_opt_subst_rates_networkinfo (pllmod_networkinfo_t * networkinfo,
+                                             unsigned int params_index,
+                                             double min_rate,
+                                             double max_rate,
+                                             double bfgs_factor,
+                                             double tolerance);
+
+PLL_EXPORT
+double pllmod_algo_opt_frequencies_networkinfo (pllmod_networkinfo_t * networkinfo,
+                                             unsigned int params_index,
+                                             double min_freq,
+                                             double max_freq,
+                                             double bfgs_factor,
+                                             double tolerance);
+
+PLL_EXPORT
+double pllmod_algo_opt_rates_weights_networkinfo (pllmod_networkinfo_t * networkinfo,
+                                               double min_rate,
+                                               double max_rate,
+                                               double bfgs_factor,
+                                               double tolerance);
+
+PLL_EXPORT
+double pllmod_algo_opt_alpha_pinv_networkinfo(pllmod_networkinfo_t * networkinfo,
+                                           unsigned int params_index,
+                                           double min_alpha,
+                                           double max_alpha,
+                                           double min_pinv,
+                                           double max_pinv,
+                                           double bfgs_factor,
+                                           double tolerance);
+
+PLL_EXPORT
+double pllmod_algo_opt_brlen_scalers_networkinfo(pllmod_networkinfo_t * networkinfo,
+                                              double min_scaler,
+                                              double max_scaler,
+                                              double min_brlen,
+                                              double max_brlen,
+                                              double lh_epsilon);
+
+
+PLL_EXPORT
+double pllmod_algo_opt_brlen_networkinfo(pllmod_networkinfo_t * networkinfo,
                                       double min_brlen,
                                       double max_brlen,
                                       double lh_epsilon,

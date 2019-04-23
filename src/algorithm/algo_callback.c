@@ -362,6 +362,76 @@ double target_func_onedim_treeinfo(void *p, double *x, double *fx, int * converg
   return score;
 }
 
+double target_func_onedim_networkinfo(void *p, double *x, double *fx, int * converged)
+{
+  struct networkinfo_opt_params * params = (struct networkinfo_opt_params *) p;
+
+  pllmod_networkinfo_t * networkinfo  = params->networkinfo;
+  int param_to_optimize               = params->param_to_optimize;
+  unsigned int num_parts              = params->num_opt_partitions;
+  networkinfo_param_set_cb param_setter  = params->param_set_cb;
+
+  double score = -INFINITY;
+
+  /* any partitions which have not converged yet? */
+  double unconverged_flag = 0.;
+
+  size_t i, j=0;
+  for (i = 0; i < networkinfo->partition_count; ++i)
+  {
+    pll_partition_t * partition = networkinfo->partitions[i];
+
+    if (networkinfo->params_to_optimize[i] & param_to_optimize)
+    {
+      if (!partition || (converged && converged[j]))
+      {
+        /* partitions has converged, skip it */
+        j++;
+        continue;
+      }
+
+      unconverged_flag = 1.;
+
+      /* if x=NULL, function was called solely to check convergence
+       * -> no update of parameter values & LH computation */
+      if (x)
+        param_setter(networkinfo, i, &x[j], 1);
+
+      j++;
+    }
+  }
+
+  assert(j == num_parts);
+
+  /* compute negative score */
+  if (x)
+    score = -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0);
+
+//  printf("score: %lf\n", score);
+
+  /* copy per-partition likelihood to the output array */
+  if (fx)
+  {
+    j = 0;
+    for (i = 0; i < networkinfo->partition_count; ++i)
+      if (networkinfo->params_to_optimize[i] & param_to_optimize)
+        fx[j++] = -1 * networkinfo->partition_loglh[i];
+  }
+
+  if (converged)
+  {
+    /* check if there is at least one unconverged partition in *any* thread */
+    if (networkinfo->parallel_reduce_cb)
+    {
+    	networkinfo->parallel_reduce_cb(networkinfo->parallel_context, &unconverged_flag, 1,
+                                   PLLMOD_COMMON_REDUCE_SUM);
+    }
+    converged[num_parts] = unconverged_flag > 0. ? 0 : 1;
+  }
+
+  return score;
+}
+
 double target_func_multidim_treeinfo(void * p, double ** x, double * fx,
                                      int * converged)
 {
@@ -481,6 +551,133 @@ double target_func_multidim_treeinfo(void * p, double ** x, double * fx,
     if (treeinfo->parallel_reduce_cb)
     {
       treeinfo->parallel_reduce_cb(treeinfo->parallel_context,
+                                   &unconverged_flag, 1, PLLMOD_COMMON_REDUCE_SUM);
+    }
+    converged[num_parts] = unconverged_flag > 0. ? 0 : 1;
+  }
+
+  return score;
+}
+
+double target_func_multidim_networkinfo(void * p, double ** x, double * fx,
+                                     int * converged)
+{
+  struct networkinfo_opt_params * params = (struct networkinfo_opt_params *) p;
+
+  pllmod_networkinfo_t * networkinfo      = params->networkinfo;
+  unsigned int num_parts            = params->num_opt_partitions;
+  unsigned int * fixed_var_index    = params->fixed_var_index;
+  int params_to_optimize            = params->param_to_optimize;
+
+  double score = -INFINITY;
+
+  /* any partitions which have not converged yet? */
+  double unconverged_flag = 0.;
+
+  size_t i, j;
+  size_t part = 0;
+  for (i = 0; i < networkinfo->partition_count; ++i)
+  {
+    pll_partition_t * partition = networkinfo->partitions[i];
+
+    if ((networkinfo->params_to_optimize[i] & params_to_optimize) == params_to_optimize)
+    {
+      if (!partition || (converged && converged[part]))
+      {
+        /* partitions has converged, skip it */
+        part++;
+        continue;
+      }
+
+      unconverged_flag = 1.;
+
+      /* function was called solely to check convergence -> no LH computation */
+      if (!x)
+      {
+        part++;
+        continue;
+      }
+
+      switch (params_to_optimize)
+      {
+        case PLLMOD_OPT_PARAM_ALPHA | PLLMOD_OPT_PARAM_PINV:
+          /* update GAMMA rate categories */
+		networkinfo->alphas[i] = x[part][0];
+          if (!pll_compute_gamma_cats (networkinfo->alphas[i],
+                                       partition->rate_cats,
+                                       partition->rates,
+                                       params->networkinfo->gamma_mode[i]))
+          {
+            assert(pll_errno);
+            return PLL_FAILURE;
+          }
+
+          /* update proportion of invariant sites */
+          for (j=0; j<partition->rate_cats; ++j)
+          {
+            if (!pll_update_invariant_sites_proportion(partition,
+            		networkinfo->param_indices[i][j],
+                                                       x[part][1]))
+            {
+              assert(pll_errno);
+              return PLL_FAILURE;
+            }
+          }
+          break;
+        case PLLMOD_OPT_PARAM_FREE_RATES:
+          /* update rate categories */
+          memcpy(partition->rates, x[part], partition->rate_cats*sizeof(double));
+          break;
+        case PLLMOD_OPT_PARAM_RATE_WEIGHTS:
+        {
+          unsigned int highest_weight_state = fixed_var_index[part];
+          unsigned int n_weights            = partition->rate_cats;
+          double sum_ratios = 1.0;
+
+          double * weights = partition->rate_weights;
+          unsigned int i, cur_weight;
+
+          for (i = 0; i < (n_weights - 1); ++i)
+            sum_ratios += x[part][i];
+
+          cur_weight = 0;
+          for (i = 0; i < (n_weights); ++i)
+            if (i != highest_weight_state)
+            {
+              weights[i] = x[part][cur_weight++] / sum_ratios;
+            }
+          weights[highest_weight_state] = 1.0 / sum_ratios;
+          break;
+        }
+        default:
+          assert(0);
+      }
+
+      part++;
+    }
+  }
+
+  /* compute negative score */
+  if(x)
+    score = -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0);
+
+  /* copy per-partition likelihood to the output array */
+  if (fx)
+  {
+    j = 0;
+    for (i = 0; i < networkinfo->partition_count; ++i)
+    {
+      if ((networkinfo->params_to_optimize[i] & params_to_optimize) == params_to_optimize)
+        fx[j++] = -1 * networkinfo->partition_loglh[i];
+    }
+  }
+
+  if (converged)
+  {
+    /* check if there is at least one unconverged partition in *any* thread */
+    if (networkinfo->parallel_reduce_cb)
+    {
+    	networkinfo->parallel_reduce_cb(networkinfo->parallel_context,
                                    &unconverged_flag, 1, PLLMOD_COMMON_REDUCE_SUM);
     }
     converged[num_parts] = unconverged_flag > 0. ? 0 : 1;

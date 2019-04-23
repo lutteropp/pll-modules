@@ -165,7 +165,7 @@ int pllmod_networkinfo_set_branch_length_partition(pllmod_networkinfo_t * networ
                                                 double length);
 
 PLL_EXPORT
-pll_rnetwork_t * pllmod_networkinfo_get_partition_tree(const pllmod_networkinfo_t * networkinfo,
+pll_rnetwork_t * pllmod_networkinfo_get_partition_network(const pllmod_networkinfo_t * networkinfo,
                                                  int partition_index);
 
 PLL_EXPORT

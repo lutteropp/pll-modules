@@ -71,6 +71,16 @@ struct treeinfo_opt_params {
   treeinfo_param_set_cb param_set_cb;
 };
 
+struct networkinfo_opt_params {
+  pllmod_networkinfo_t * networkinfo;
+  int param_to_optimize;            /* which parameter is being optimized */
+  unsigned int num_opt_partitions;  /* number of partitions to optimize */
+  unsigned int params_index;        /* which matrix to optimize */
+  unsigned int * num_free_params;   /* number of free params for each partition*/
+  unsigned int * fixed_var_index;   /* which variable is not being optimized */
+  networkinfo_param_set_cb param_set_cb;
+};
+
 
 /* optimize frequencies */
 double target_freqs_func(void *p, double *x);
@@ -101,6 +111,12 @@ double target_func_onedim_treeinfo(void *p, double *x, double *fx,
                                    int * converged);
 
 double target_func_multidim_treeinfo(void * p, double ** x, double * fx,
+                                     int * converged);
+
+double target_func_onedim_networkinfo(void *p, double *x, double *fx,
+                                   int * converged);
+
+double target_func_multidim_networkinfo(void * p, double ** x, double * fx,
                                      int * converged);
 
 double target_subst_params_func_multi(void * p, double ** x, double * fx,

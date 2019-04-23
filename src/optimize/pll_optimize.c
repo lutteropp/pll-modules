@@ -1311,6 +1311,33 @@ static void update_prob_matrices(pll_partition_t ** partitions,
   }
 }
 
+static void update_prob_matrices_network(pll_partition_t ** partitions,
+                                 size_t partition_count,
+                                 unsigned int ** params_indices,
+                                 double ** brlen_buffers,
+                                 double * brlen_scalers,
+                                 pll_rnetwork_node_t * node)
+{
+  unsigned int p;
+  unsigned int m = node->pmatrix_index;
+
+  for (p = 0; p < partition_count; ++p)
+  {
+    /* skip remote partitions */
+    if (!partitions[p])
+      continue;
+
+    double p_brlen = brlen_buffers ? brlen_buffers[p][m] : node->length;
+
+    if (brlen_scalers)
+      p_brlen *= brlen_scalers[p];
+
+    pll_update_prob_matrices(partitions[p],
+                             params_indices[p],
+                             &m,
+                             &p_brlen, 1);
+  }
+}
 
 static int allocate_buffers(pll_newton_tree_params_multi_t * params)
 {
@@ -1864,6 +1891,245 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi (
                                                         tree->clv_index,
                                                         tree->scaler_index,
                                                         tree->pmatrix_index,
+                                                        params_indices,
+                                                        NULL,
+                                                        parallel_context,
+                                                        parallel_reduce_cb);
+
+    DBG("BLO_multi: iteration %u, old LH: %.9f, new LH: %.9f\n",
+        (unsigned int) max_iters - iters, loglikelihood, new_loglikelihood);
+
+    if (new_loglikelihood - loglikelihood > new_loglikelihood * BETTER_LL_TRESHOLD)
+    {
+      iters --;
+
+      /* check convergence */
+      if (fabs (new_loglikelihood - loglikelihood) < lh_epsilon) iters = 0;
+
+      loglikelihood = new_loglikelihood;
+    }
+    else
+    {
+      if (params.opt_method == PLLMOD_OPT_BLO_NEWTON_SAFE ||
+          params.opt_method == PLLMOD_OPT_BLO_NEWTON_OLDSAFE)
+        assert(new_loglikelihood - loglikelihood > new_loglikelihood * BETTER_LL_TRESHOLD);
+      else if (opt_method == PLLMOD_OPT_BLO_NEWTON_FALLBACK)
+      {
+        // reset branch lenghts
+        params.opt_method = PLLMOD_OPT_BLO_NEWTON_SAFE;
+        iters = max_iters;
+      }
+      else
+      {
+        pllmod_set_error(PLLMOD_OPT_ERROR_NEWTON_WORSE_LK,
+                         "BL opt converged to a worse likelihood score by %.15f units",
+                         new_loglikelihood - loglikelihood);
+        goto cleanup;
+      }
+    }
+
+  }  // while
+
+  result = -1*loglikelihood;
+
+cleanup:
+  /* deallocate sumtable */
+  if (!precomp_buffers)
+  {
+    for (p = 0; p < partition_count; ++p)
+    {
+      if (params.precomp_buffers[p])
+        free(params.precomp_buffers[p]);
+    }
+    pll_aligned_free(params.precomp_buffers);
+  }
+
+  if (params.brlen_buffers && !brlen_buffers)
+  {
+    free(params.brlen_buffers[0]);
+    free(params.brlen_buffers);
+  }
+
+  if (params.converged)
+    free(params.converged);
+
+  if (params.brlen_guess)
+    free(params.brlen_guess);
+
+  if (params.brlen_orig)
+    free(params.brlen_orig);
+
+  return result;
+} /* pllmod_opt_optimize_branch_lengths_local */
+
+/**
+ * Optimize branch lengths locally around a given edge using Newton-Raphson
+ * minimization algorithm on a multiple partition.
+ *
+ * Check `pllmod_opt_optimize_branch_lengths_local` documentation.
+ *
+ * @param[in,out]  partitions list of partitions
+ * @param  partition_count    number of partitions in `partitions`
+ * @param[in,out]  tree       the PLL unrooted tree structure
+ * @param  params_indices     the indices of the parameter sets
+ * @param  precomp_buffers    buffer for sumtable (NULL=allocate internally)
+ * @param  brlen_buffers      buffer for branch lengths (NULL=allocate internally)
+ * @param  brlen_scalers      branch length scalers
+ * @param  branch_length_min  lower bound for branch lengths
+ * @param  branch_length_max  upper bound for branch lengths
+ * @param  tolerance          tolerance for Newton-Raphson algorithm
+ * @param  smoothings         number of iterations over the branches
+ * @param  radius             radius from the virtual root
+ * @param  keep_update        if true, branch lengths are iteratively updated in the tree structure
+ * @param  opt_method         optimization method to use (see PLLMOD_OPT_BLO_* constants)
+ * @param  parallel_context   context for parallel computation
+ * @param  parallel_reduce_cb callback function for parallel reduction
+ *
+ * @return                   the likelihood score after optimizing branch lengths
+ */
+PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi_network (
+                                              pll_partition_t ** partitions,
+                                              size_t partition_count,
+                                              pll_rnetwork_node_t * network,
+                                              unsigned int ** params_indices,
+                                              double ** precomp_buffers,
+                                              double ** brlen_buffers,
+                                              double * brlen_scalers,
+                                              double branch_length_min,
+                                              double branch_length_max,
+                                              double lh_epsilon,
+                                              int max_iters,
+                                              int radius,
+                                              int keep_update,
+                                              int opt_method,
+                                              int brlen_linkage,
+                                              void * parallel_context,
+                                              void (*parallel_reduce_cb)(void *,
+                                                                         double *,
+                                                                         size_t,
+                                                                         int))
+{
+  unsigned int iters;
+  double loglikelihood = 0.0, new_loglikelihood;
+  size_t p;
+  double result = (double) PLL_FAILURE;
+
+  pllmod_reset_error();
+
+  /**
+   * preconditions:
+   *    (1) CLVs must be updated towards 'tree'
+   *    (2) Pmatrix indices must be **unique** for each branch
+   */
+
+  if (opt_method == PLLMOD_OPT_BLO_NEWTON_FALLBACK ||
+      opt_method == PLLMOD_OPT_BLO_NEWTON_GLOBAL)
+  {
+    pllmod_set_error(PLLMOD_ERROR_NOT_IMPLEMENTED,
+                     "Optimization method not implemented: "
+                     "NEWTON_FALLBACK, NEWTON_GLOBAL");
+    return (double)PLL_FAILURE;
+  }
+
+  if (radius < PLLMOD_OPT_BRLEN_OPTIMIZE_ALL)
+  {
+    pllmod_set_error(PLLMOD_OPT_ERROR_NEWTON_BAD_RADIUS,
+                     "Invalid radius for branch length optimization");
+    return (double)PLL_FAILURE;
+  }
+
+  /* make sure p-matrices are up-to-date */
+  update_prob_matrices_network(partitions, partition_count, params_indices,
+                       brlen_buffers, brlen_scalers, network);
+
+  /* get the initial likelihood score */
+  loglikelihood = pllmod_opt_compute_edge_loglikelihood_multi (
+                                                      partitions,
+                                                      partition_count,
+													  network->back->clv_index,
+													  network->back->scaler_index,
+													  network->clv_index,
+													  network->scaler_index,
+													  network->pmatrix_index,
+                                                      params_indices,
+                                                      NULL,
+                                                      parallel_context,
+                                                      parallel_reduce_cb);
+
+  DBG("\nStarting BLO_multi: radius: %d, max_iters: %u, lh_eps: %f, old LH: %.9f\n",
+      radius, max_iters, lh_epsilon, loglikelihood);
+
+  /* set parameters for N-R optimization */
+  pll_newton_network_params_multi_t params;
+  params.partitions        = partitions;
+  params.partition_count   = partition_count;
+  params.network              = network;
+  params.params_indices    = params_indices;
+  params.branch_length_min = (branch_length_min>0)?
+                              branch_length_min:
+                              PLLMOD_OPT_MIN_BRANCH_LEN;
+  params.branch_length_max = (branch_length_max>0)?
+                              branch_length_max:
+                              PLLMOD_OPT_MAX_BRANCH_LEN;
+  params.tolerance         = (branch_length_min>0)?
+                              branch_length_min/10.0:
+                              PLLMOD_OPT_TOL_BRANCH_LEN;
+  params.precomp_buffers   = precomp_buffers;
+  params.brlen_buffers     = brlen_buffers;
+  params.brlen_scalers     = brlen_scalers;
+  params.opt_method        = opt_method;
+  params.brlen_linkage     = (partition_count > 1) ?
+                             brlen_linkage : PLLMOD_COMMON_BRLEN_LINKED;
+  params.max_newton_iters  = 30;
+
+  params.brlen_orig        = NULL;
+  params.brlen_guess       = NULL;
+  params.converged         = NULL;
+
+  params.parallel_context = parallel_context;
+  params.parallel_reduce_cb = parallel_reduce_cb;
+
+  /* allocate the sumtable if needed */
+  if (!allocate_buffers(&params))
+  {
+    pllmod_set_error(PLL_ERROR_MEM_ALLOC,
+                     "Cannot allocate memory for brlen opt variables");
+    goto cleanup;
+  }
+
+  iters = (unsigned int) max_iters;
+  while (iters)
+  {
+    new_loglikelihood = loglikelihood;
+
+    /* iterate on first edge */
+    params.network = network;
+    if (!recomp_iterative_multi (&params, radius, &new_loglikelihood, keep_update))
+    {
+      assert(pll_errno);
+      goto cleanup;
+    }
+
+    if (radius)
+    {
+      /* iterate on second edge */
+      params.network = network->back;
+      if (!recomp_iterative_multi (&params, radius-1, &new_loglikelihood, keep_update))
+      {
+        assert(pll_errno);
+        goto cleanup;
+      }
+    }
+
+    /* compute likelihood after optimization */
+    new_loglikelihood = pllmod_opt_compute_edge_loglikelihood_multi (
+                                                        partitions,
+                                                        partition_count,
+														network->back->clv_index,
+														network->back->scaler_index,
+														network->clv_index,
+														network->scaler_index,
+														network->pmatrix_index,
                                                         params_indices,
                                                         NULL,
                                                         parallel_context,
