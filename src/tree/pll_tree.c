@@ -1512,50 +1512,6 @@ PLL_EXPORT int pllmod_utree_draw_support(pll_utree_t * ref_tree,
   return PLL_SUCCESS;
 }
 
-PLL_EXPORT int pllmod_unetwork_draw_support(pll_unetwork_t * ref_network,
-                                         const double * support,
-                                         pll_unetwork_node_t ** node_map,
-                                         char * (*cb_serialize)(double) )
-{
-  if (!ref_network || !support)
-  {
-    pllmod_set_error(PLL_ERROR_PARAM_INVALID, "Parameter is NULL!\n");
-    return PLL_FAILURE;
-  }
-
-  unsigned int split_count = ref_network->edge_count - ref_network->tip_count;
-  for (size_t i = 0; i < split_count; ++i)
-  {
-	  pll_unetwork_node_t * node = node_map ? node_map[i] :
-    		ref_network->nodes[ref_network->tip_count + i];
-
-    /* this has to be an inner node! */
-    assert(node->next);
-
-    if (node->label)
-      free(node->label);
-
-    node->label = node->next->label = node->next->next->label =
-        cb_serialize ? cb_serialize(support[i]) : default_support_fmt(support[i]);
-  }
-
-  /* set support value for the root branch to both adjacent nodes */
-  pll_unetwork_node_t * root = ref_network->vroot;
-  if (!root->label && root->back->next)
-  {
-    assert(root->back->label);
-    root->label = root->next->label = root->next->next->label = strdup(root->back->label);
-  }
-  else if (!root->back->label && root->next)
-  {
-    assert(root->label);
-    root->back->label = root->back->next->label = root->back->next->next->label =
-        strdup(root->label);
-  }
-
-  return PLL_SUCCESS;
-}
-
 
 /******************************************************************************/
 /* Static functions */

@@ -77,6 +77,13 @@ PLL_EXPORT double pllmod_algo_opt_frequencies (pll_partition_t * partition,
                                                double bfgs_factor,
                                                double tolerance);
 
+PLL_EXPORT double pllmod_algo_opt_frequencies_network (pll_partition_t * partition,
+                                               pll_unetwork_node_t * network,
+                                               unsigned int params_index,
+                                               unsigned int * params_indices,
+                                               double bfgs_factor,
+                                               double tolerance);
+
 /*
  * Optimize substitution rates for parameters `params_index`.
  * symmetries is an array with as many positions as substitution parameters,
@@ -94,8 +101,26 @@ PLL_EXPORT double pllmod_algo_opt_subst_rates (pll_partition_t * partition,
                                                double bfgs_factor,
                                                double tolerance);
 
+PLL_EXPORT double pllmod_algo_opt_subst_rates_network (pll_partition_t * partition,
+                                               pll_unetwork_node_t * network,
+                                               unsigned int params_index,
+                                               unsigned int * params_indices,
+                                               int * symmetries,
+                                               double min_rate,
+                                               double max_rate,
+                                               double bfgs_factor,
+                                               double tolerance);
+
 PLL_EXPORT double pllmod_algo_opt_alpha (pll_partition_t * partition,
                                          pll_unode_t * tree,
+                                         unsigned int * params_indices,
+                                         double min_alpha,
+                                         double max_alpha,
+                                         double *alpha,
+                                         double tolerance);
+
+PLL_EXPORT double pllmod_algo_opt_alpha_network (pll_partition_t * partition,
+                                         pll_unetwork_node_t * network,
                                          unsigned int * params_indices,
                                          double min_alpha,
                                          double max_alpha,
@@ -109,8 +134,27 @@ PLL_EXPORT double pllmod_algo_opt_pinv (pll_partition_t * partition,
                                         double max_pinv,
                                         double tolerance);
 
+
+PLL_EXPORT double pllmod_algo_opt_pinv_network (pll_partition_t * partition,
+                                        pll_unetwork_node_t * network,
+                                        unsigned int * params_indices,
+                                        double min_pinv,
+                                        double max_pinv,
+                                        double tolerance);
+
 PLL_EXPORT double pllmod_algo_opt_alpha_pinv (pll_partition_t * partition,
                                               pll_unode_t * tree,
+                                              unsigned int * params_indices,
+                                              double min_alpha,
+                                              double max_alpha,
+                                              double *alpha,
+                                              double min_pinv,
+                                              double max_pinv,
+                                              double bfgs_factor,
+                                              double tolerance);
+
+PLL_EXPORT double pllmod_algo_opt_alpha_pinv_network (pll_partition_t * partition,
+                                              pll_unetwork_node_t * network,
                                               unsigned int * params_indices,
                                               double min_alpha,
                                               double max_alpha,
@@ -134,8 +178,26 @@ PLL_EXPORT double pllmod_algo_opt_rates_weights (pll_partition_t * partition,
                                                  double * brlen_scaler,
                                                  int scale_branches);
 
+PLL_EXPORT double pllmod_algo_opt_rates_weights_network (pll_partition_t * partition,
+                                                 pll_unetwork_node_t * network,
+                                                 unsigned int * params_indices,
+                                                 double min_rate,
+                                                 double max_rate,
+                                                 double bfgs_factor,
+                                                 double tolerance,
+                                                 double * brlen_scaler,
+                                                 int scale_branches);
+
 PLL_EXPORT double pllmod_algo_opt_brlen_scaler (pll_partition_t * partition,
                                                 pll_unode_t * tree,
+                                                unsigned int * params_indices,
+                                                double * scaler,
+                                                double min_scaler,
+                                                double max_scaler,
+                                                double tolerance);
+
+PLL_EXPORT double pllmod_algo_opt_brlen_scaler_network (pll_partition_t * partition,
+                                                pll_unetwork_node_t * network,
                                                 unsigned int * params_indices,
                                                 double * scaler,
                                                 double min_scaler,
@@ -293,7 +355,7 @@ PLL_EXPORT double pllmod_algo_spr_round(pllmod_treeinfo_t * treeinfo,
                                         cutoff_info_t * cutoff_info,
                                         double subtree_cutoff);
 
-PLL_EXPORT double pllmod_algo_spr_round_networkinfo(pllmod_networkinfo_t * networkinfo,
+PLL_EXPORT double pllmod_algo_spr_round_network(pllmod_networkinfo_t * networkinfo,
                                         int radius_min,
                                         int radius_max,
                                         int n_topologies,

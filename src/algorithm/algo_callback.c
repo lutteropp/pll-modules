@@ -405,7 +405,7 @@ double target_func_onedim_networkinfo(void *p, double *x, double *fx, int * conv
 
   /* compute negative score */
   if (x)
-    score = -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0);
+    score = -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
 
 //  printf("score: %lf\n", score);
 
@@ -659,7 +659,7 @@ double target_func_multidim_networkinfo(void * p, double ** x, double * fx,
 
   /* compute negative score */
   if(x)
-    score = -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0);
+    score = -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
 
   /* copy per-partition likelihood to the output array */
   if (fx)

@@ -5,5 +5,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${PLLMOD_CFLAGS}")
 
 add_pllmodules_lib(pllmodnetwork "${NETWORK_SOURCES}")
 
-
+target_include_directories(pllmodnetwork_obj PRIVATE ${PLLMOD_INCLUDE_PATH}
+  ${CMAKE_CURRENT_SOURCE_DIR}/../tree
+  )
 

@@ -20,19 +20,19 @@
  */
 
  /**
-  * @file utree_distances.c
+  * @file unetwork_distances.c
   *
-  * @brief Operations on splits for unrooted trees
+  * @brief Operations on splits for unrooted networks
   *
   * @author Diego Darriba
   */
 
-#include "pll_tree.h"
-#include "tree_hashtable.h"
+#include "pll_network.h"
+#include "../tree/tree_hashtable.h"
 
 #include "../pllmod_common.h"
 
-static int cb_get_splits(pll_unode_t * node, void *data);
+static int cb_get_splits_network(pll_unetwork_node_t * node, void *data);
 static inline void merge_split(pll_split_t to,
                          const pll_split_t from,
                          unsigned int split_len);
@@ -41,14 +41,21 @@ static int _cmp_split_node_pair (const void * a, const void * b);
 static int compare_splits (pll_split_t s1,
                            pll_split_t s2,
                            unsigned int split_len);
-static unsigned int get_utree_splitmap_id(pll_unode_t * node,
+static unsigned int get_unetwork_splitmap_id(pll_unetwork_node_t * node,
+                                          unsigned int tip_count);
+static unsigned int get_unetwork_splitmap_id(pll_unetwork_node_t * node,
                                           unsigned int tip_count);
 static int split_is_valid_and_normalized(const pll_split_t bitv,
                                          unsigned int tip_count);
 
 struct split_node_pair {
   pll_split_t split;
-  pll_unode_t * node;
+  pll_unetwork_node_t * node;
+};
+
+struct split_node_pair_network {
+  pll_split_t split;
+  pll_unetwork_node_t * node;
 };
 
 struct cb_split_params
@@ -61,23 +68,33 @@ struct cb_split_params
   int *id_to_split;          /* map between node/subnode ids and splits */
 };
 
+struct cb_split_params_network
+{
+  struct split_node_pair_network * split_nodes;
+  unsigned int tip_count;
+  unsigned int split_size;
+  unsigned int split_len;
+  unsigned int split_count;  /* number of splits already set */
+  int *id_to_split;          /* map between node/subnode ids and splits */
+};
+
 /**
- * Check whether tip node indices in 2 trees are consistent to each other.
+ * Check whether tip node indices in 2 networks are consistent to each other.
  *
  * Data pointers must contain the node index at first position
- * @param  t1 first tree
- * @param  t2 second tree
+ * @param  t1 first network
+ * @param  t2 second network
  *
  * @return PLL_SUCCESS if node indices are consistent,
  *         PLL_FAILURE otherwise (check pll_errmsg for details)
  */
-PLL_EXPORT int pllmod_utree_consistency_check(pll_utree_t * t1,
-                                              pll_utree_t * t2)
+PLL_EXPORT int pllmod_unetwork_consistency_check(pll_unetwork_t * t1,
+                                              pll_unetwork_t * t2)
 {
   unsigned int i;
   unsigned int node_id;
   int retval = PLL_SUCCESS;
-  pll_unode_t ** tipnodes = t1->nodes;
+  pll_unetwork_node_t ** tipnodes = t1->nodes;
   char ** tipnames;
   unsigned int tip_count = t1->tip_count;
 
@@ -124,19 +141,19 @@ PLL_EXPORT int pllmod_utree_consistency_check(pll_utree_t * t1,
  * Set t2 tip node indices consistent with t1.
  *
  * Data pointers must contain the node index at first position
- * @param  t1 reference tree
- * @param  t2 second tree
+ * @param  t1 reference network
+ * @param  t2 second network
  *
  * @return PLL_SUCCESS if the operation was applied correctly,
  *         PLL_FAILURE otherwise (check pll_errmsg for details)
  */
-PLL_EXPORT int pllmod_utree_consistency_set(pll_utree_t * t1,
-                                            pll_utree_t * t2)
+PLL_EXPORT int pllmod_unetwork_consistency_set(pll_unetwork_t * t1,
+                                            pll_unetwork_t * t2)
 {
   unsigned int i, j;
   unsigned int node_id;
   int retval = PLL_SUCCESS, checkval;
-  pll_unode_t ** tipnodes = t1->nodes;
+  pll_unetwork_node_t ** tipnodes = t1->nodes;
   char ** tipnames;
   unsigned int tip_count = t1->tip_count;
 
@@ -167,8 +184,8 @@ PLL_EXPORT int pllmod_utree_consistency_set(pll_utree_t * t1,
   tipnodes = t2->nodes;
   for (i = 0; i < tip_count; ++i)
   {
-    // node_id = get_utree_node_id(tipnodes[i]);
-    pll_unode_t * tipnode = tipnodes[i];
+    // node_id = get_unetwork_node_id(tipnodes[i]);
+	  pll_unetwork_node_t * tipnode = tipnodes[i];
     checkval = 0;
     for (j = 0; j < tip_count; ++j)
     {
@@ -193,8 +210,8 @@ PLL_EXPORT int pllmod_utree_consistency_set(pll_utree_t * t1,
 /******************************************************************************/
 /* discrete operations */
 
-PLL_EXPORT unsigned int pllmod_utree_rf_distance(pll_unode_t * t1,
-                                                 pll_unode_t * t2,
+PLL_EXPORT unsigned int pllmod_unetwork_rf_distance(pll_unetwork_node_t * t1,
+		                                         pll_unetwork_node_t * t2,
                                                  unsigned int tip_count)
 {
   unsigned int rf_distance;
@@ -202,16 +219,16 @@ PLL_EXPORT unsigned int pllmod_utree_rf_distance(pll_unode_t * t1,
   /* reset pll_error */
   pll_errno = 0;
 
-  /* split both trees */
-  pll_split_t * s1 = pllmod_utree_split_create(t1, tip_count, NULL);
-  pll_split_t * s2 = pllmod_utree_split_create(t2, tip_count, NULL);
+  /* split both networks */
+  pll_split_t * s1 = pllmod_unetwork_split_create(t1, tip_count, NULL);
+  pll_split_t * s2 = pllmod_unetwork_split_create(t2, tip_count, NULL);
 
   /* compute distance */
-  rf_distance = pllmod_utree_split_rf_distance(s1, s2, tip_count);
+  rf_distance = pllmod_unetwork_split_rf_distance(s1, s2, tip_count);
 
   /* clean up */
-  pllmod_utree_split_destroy(s1);
-  pllmod_utree_split_destroy(s2);
+  pllmod_unetwork_split_destroy(s1);
+  pllmod_unetwork_split_destroy(s2);
 
   assert(rf_distance <= 2*(tip_count-3));
   return rf_distance;
@@ -220,7 +237,7 @@ PLL_EXPORT unsigned int pllmod_utree_rf_distance(pll_unode_t * t1,
 /*
  * Precondition: splits must be normalized and sorted!
  */
-PLL_EXPORT unsigned int pllmod_utree_split_rf_distance(pll_split_t * s1,
+PLL_EXPORT unsigned int pllmod_unetwork_split_rf_distance(pll_split_t * s1,
                                                        pll_split_t * s2,
                                                        unsigned int tip_count)
 {
@@ -261,7 +278,7 @@ PLL_EXPORT unsigned int pllmod_utree_split_rf_distance(pll_split_t * s1,
 
 
 /******************************************************************************/
-/* tree split functions */
+/* network split functions */
 
 /*
  * Normalize and sort.
@@ -281,7 +298,7 @@ PLL_EXPORT unsigned int pllmod_utree_split_rf_distance(pll_split_t * s1,
  * a contiguous chunk of memory and you want to use s[0] to deallocate it in
  * the future.
  */
-PLL_EXPORT void pllmod_utree_split_normalize_and_sort(pll_split_t * s,
+PLL_EXPORT void pllmod_unetwork_split_normalize_and_sort(pll_split_t * s,
                                                       unsigned int tip_count,
                                                       unsigned int split_count,
                                                       int keep_first)
@@ -324,7 +341,7 @@ PLL_EXPORT void pllmod_utree_split_normalize_and_sort(pll_split_t * s,
   }
 }
 
-PLL_EXPORT void pllmod_utree_split_show(pll_split_t split, unsigned int tip_count)
+PLL_EXPORT void pllmod_unetwork_split_show(pll_split_t split, unsigned int tip_count)
 {
   unsigned int split_size   = sizeof(pll_split_base_t) * 8;
   unsigned int split_offset = tip_count % split_size;
@@ -340,8 +357,8 @@ PLL_EXPORT void pllmod_utree_split_show(pll_split_t split, unsigned int tip_coun
     (split[i]&(1u<<j))?putchar('*'):putchar('-');
 }
 
-PLL_EXPORT pll_split_t pllmod_utree_split_from_tips(unsigned int * subtree_tip_ids,
-                                                    unsigned int subtree_size,
+PLL_EXPORT pll_split_t pllmod_unetwork_split_from_tips(unsigned int * subnetwork_tip_ids,
+                                                    unsigned int subnetwork_size,
                                                     unsigned int tip_count)
 {
   size_t split_size = (sizeof(pll_split_base_t) * 8);
@@ -349,9 +366,9 @@ PLL_EXPORT pll_split_t pllmod_utree_split_from_tips(unsigned int * subtree_tip_i
       (tip_count % (sizeof(pll_split_base_t) * 8) > 0);
   pll_split_t split = (pll_split_t) calloc(split_len, sizeof(pll_split_base_t));
 
-  for (unsigned int i = 0; i < subtree_size; ++i)
+  for (unsigned int i = 0; i < subnetwork_size; ++i)
   {
-    unsigned int tip_id = subtree_tip_ids[i];
+    unsigned int tip_id = subnetwork_tip_ids[i];
     int vec_id  = tip_id / split_size;
     int bit_id  = tip_id % split_size;
     split[vec_id] |= (1 << bit_id);
@@ -360,15 +377,15 @@ PLL_EXPORT pll_split_t pllmod_utree_split_from_tips(unsigned int * subtree_tip_i
   return split;
 }
 
-PLL_EXPORT unsigned int pllmod_utree_split_lightside(pll_split_t split,
+PLL_EXPORT unsigned int pllmod_unetwork_split_lightside(pll_split_t split,
                                                      unsigned int tip_count)
 {
   return bitv_lightside(split, tip_count, 0);
 }
 
 
-/* This function computes a classical Hamming distance between two tree splits */
-PLL_EXPORT unsigned int pllmod_utree_split_hamming_distance(pll_split_t s1,
+/* This function computes a classical Hamming distance between two network splits */
+PLL_EXPORT unsigned int pllmod_unetwork_split_hamming_distance(pll_split_t s1,
                                                             pll_split_t s2,
                                                             unsigned int tip_count)
 {
@@ -389,9 +406,9 @@ PLL_EXPORT unsigned int pllmod_utree_split_hamming_distance(pll_split_t s1,
  *
  * split_to_node_map can be NULL
  */
-PLL_EXPORT pll_split_t * pllmod_utree_split_create(const pll_unode_t * tree,
+PLL_EXPORT pll_split_t * pllmod_unetwork_split_create(const pll_unetwork_node_t * network,
                                                    unsigned int tip_count,
-                                                   pll_unode_t ** split_to_node_map)
+                                                   pll_unetwork_node_t ** split_to_node_map)
 {
   unsigned int i;
   unsigned int split_count, split_len, split_size;
@@ -458,14 +475,14 @@ PLL_EXPORT pll_split_t * pllmod_utree_split_create(const pll_unode_t * tree,
   for (i=0; i<3*(tip_count-2);++i)
     split_data.id_to_split[i] = -1;
 
-  if (pllmod_utree_is_tip(tree))
-    tree = tree->back;
+  if (pllmod_unetwork_is_tip(network))
+    network = network->back;
 
   /* traverse for computing the scripts */
-  pllmod_utree_traverse_apply((pll_unode_t *) tree,
+  pllmod_unetwork_traverse_apply((pll_unetwork_node_t *) network,
                               NULL,
                               NULL,
-                              &cb_get_splits,
+                              &cb_get_splits_network,
                               &split_data);
 
   assert(split_data.split_count == split_count);
@@ -535,7 +552,7 @@ PLL_EXPORT pll_split_t * pllmod_utree_split_create(const pll_unode_t * tree,
 }
 
 PLL_EXPORT
-bitv_hashtable_t * pllmod_utree_split_hashtable_create(unsigned int tip_count,
+bitv_hashtable_t * pllmod_unetwork_split_hashtable_create(unsigned int tip_count,
                                                        unsigned int slot_count)
 {
   if (!slot_count)
@@ -545,7 +562,7 @@ bitv_hashtable_t * pllmod_utree_split_hashtable_create(unsigned int tip_count,
 }
 
 PLL_EXPORT bitv_hash_entry_t *
-pllmod_utree_split_hashtable_insert_single(bitv_hashtable_t * splits_hash,
+pllmod_unetwork_split_hashtable_insert_single(bitv_hashtable_t * splits_hash,
                                            pll_split_t split,
                                            double support)
 {
@@ -576,7 +593,7 @@ pllmod_utree_split_hashtable_insert_single(bitv_hashtable_t * splits_hash,
  * @returns hashtable with splits
  */
 PLL_EXPORT bitv_hashtable_t *
-pllmod_utree_split_hashtable_insert(bitv_hashtable_t * splits_hash,
+pllmod_unetwork_split_hashtable_insert(bitv_hashtable_t * splits_hash,
                                     pll_split_t * splits,
                                     unsigned int tip_count,
                                     unsigned int split_count,
@@ -624,7 +641,7 @@ pllmod_utree_split_hashtable_insert(bitv_hashtable_t * splits_hash,
 }
 
 PLL_EXPORT bitv_hash_entry_t *
-pllmod_utree_split_hashtable_lookup(bitv_hashtable_t * splits_hash,
+pllmod_unetwork_split_hashtable_lookup(bitv_hashtable_t * splits_hash,
                                     pll_split_t split,
                                     unsigned int tip_count)
 {
@@ -644,13 +661,13 @@ pllmod_utree_split_hashtable_lookup(bitv_hashtable_t * splits_hash,
 }
 
 PLL_EXPORT
-void pllmod_utree_split_hashtable_destroy(bitv_hashtable_t * hash)
+void pllmod_unetwork_split_hashtable_destroy(bitv_hashtable_t * hash)
 {
   if (hash)
     hash_destroy(hash);
 }
 
-PLL_EXPORT void pllmod_utree_split_destroy(pll_split_t * split_list)
+PLL_EXPORT void pllmod_unetwork_split_destroy(pll_split_t * split_list)
 {
   free(split_list[0]);
   free(split_list);
@@ -675,7 +692,7 @@ static inline void merge_split(pll_split_t to,
  * The splits will be stored in data->splits
  * at positions given by node index
  */
-static int cb_get_splits(pll_unode_t * node, void *data)
+static int cb_get_splits_network(pll_unetwork_node_t * node, void *data)
 {
   struct cb_split_params * split_data = (struct cb_split_params *) data;
   pll_split_t current_split;
@@ -687,14 +704,14 @@ static int cb_get_splits(pll_unode_t * node, void *data)
   unsigned int my_map_id, back_map_id;
   unsigned int tip_id, split_id;
 
-  if (!(pllmod_utree_is_tip(node) || pllmod_utree_is_tip(node->back)))
+  if (!(pllmod_unetwork_is_tip(node) || pllmod_unetwork_is_tip(node->back)))
   {
-    my_map_id   = get_utree_splitmap_id(node, tip_count);
-    back_map_id = get_utree_splitmap_id(node->back, tip_count);
+    my_map_id   = get_unetwork_splitmap_id(node, tip_count);
+    back_map_id = get_unetwork_splitmap_id(node->back, tip_count);
     my_split_id = split_data->split_count;
 
     /* check if the split for the branch was already set */
-    /* note that tree traversals visit the virtual root branch twice */
+    /* note that network traversals visit the virtual root branch twice */
     if (split_data->id_to_split[my_map_id] >= 0)
     {
       return 1;
@@ -712,10 +729,10 @@ static int cb_get_splits(pll_unode_t * node, void *data)
     split_data->split_count++;
 
     /* add the split from left branch */
-    if (!pllmod_utree_is_tip(node->next->back))
+    if (!pllmod_unetwork_is_tip(node->next->back))
     {
       child_split_id = (unsigned int)
-        split_data->id_to_split[get_utree_splitmap_id(node->next, tip_count)];
+        split_data->id_to_split[get_unetwork_splitmap_id(node->next, tip_count)];
 
       memcpy(current_split, split_data->split_nodes[child_split_id].split,
              sizeof(pll_split_base_t) * split_len);
@@ -730,10 +747,10 @@ static int cb_get_splits(pll_unode_t * node, void *data)
     }
 
     /* add the split from right branch */
-    if (!pllmod_utree_is_tip(node->next->next->back))
+    if (!pllmod_unetwork_is_tip(node->next->next->back))
     {
       child_split_id = (unsigned int)
-        split_data->id_to_split[get_utree_splitmap_id(
+        split_data->id_to_split[get_unetwork_splitmap_id(
             node->next->next, tip_count)];
       merge_split(current_split, split_data->split_nodes[child_split_id].split, split_len);
     }
@@ -756,7 +773,7 @@ static int cb_get_splits(pll_unode_t * node, void *data)
  * following agree.
  *
  * _cmp_splits is used for sorting.
- * compare_splits is used for comparing splits from different trees
+ * compare_splits is used for comparing splits from different networks
  */
 static int compare_splits (pll_split_t s1,
                            pll_split_t s2,
@@ -797,7 +814,7 @@ static int _cmp_split_node_pair (const void * a, const void * b)
   The position of the node in the map of branches to splits is computed
   according to the node id.
  */
-static unsigned int get_utree_splitmap_id(pll_unode_t * node,
+static unsigned int get_unetwork_splitmap_id(pll_unetwork_node_t * node,
                                           unsigned int tip_count)
 {
   unsigned int node_id = node->node_index;

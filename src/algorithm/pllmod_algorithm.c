@@ -993,7 +993,7 @@ double pllmod_algo_opt_onedim_networkinfo_custom(pllmod_networkinfo_t * networki
     }
   }
 
-  double cur_logl = pllmod_networkinfo_compute_loglh(networkinfo, 0);
+  double cur_logl = pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
 
   return -1 * cur_logl;
 }
@@ -1217,7 +1217,7 @@ double pllmod_algo_opt_brlen_scalers_networkinfo(pllmod_networkinfo_t * networki
     return (double) PLL_FAILURE;
   }
 
-  old_loglh = pllmod_networkinfo_compute_loglh(networkinfo, 0);
+  old_loglh = pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
 
   /* save old brlen scalers in case we will have to revert optimization */
   old_scalers = (double *) calloc(networkinfo->init_partition_count,
@@ -1266,7 +1266,7 @@ double pllmod_algo_opt_brlen_scalers_networkinfo(pllmod_networkinfo_t * networki
 
   if (brlen_fixed)
   {
-    loglh = pllmod_networkinfo_compute_loglh(networkinfo, 0);
+    loglh = pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
     if (loglh < old_loglh)
     {
       /* revert optimization and restore old values */
@@ -1288,7 +1288,7 @@ double pllmod_algo_opt_brlen_scalers_networkinfo(pllmod_networkinfo_t * networki
         //}
       }
 
-      loglh = pllmod_networkinfo_compute_loglh(networkinfo, 0);
+      loglh = pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
     }
   }
 
@@ -1529,7 +1529,7 @@ double pllmod_algo_opt_subst_rates_networkinfo (pllmod_networkinfo_t * networkin
 
   /* nothing to optimize */
   if (!part_count)
-    return -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0);
+    return -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
 
   x  = (double **) malloc(sizeof(double*) * (part_count));
   lb = (double **) malloc(sizeof(double*) * (part_count));
@@ -1852,7 +1852,7 @@ double pllmod_algo_opt_frequencies_networkinfo (pllmod_networkinfo_t * networkin
 
   /* nothing to optimize */
   if (!part_count)
-    return -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0);
+    return -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
 
   /* IMPORTANT: we need to know max_free_params among all threads! */
   if (networkinfo->parallel_reduce_cb)
@@ -2121,7 +2121,7 @@ double pllmod_algo_opt_alpha_pinv_networkinfo(pllmod_networkinfo_t * networkinfo
 
   /* nothing to optimize */
   if (!part_count)
-    return -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0);
+    return -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
 
   x  = (double **) malloc(sizeof(double*) * part_count);
   xd = (double *)  malloc(sizeof(double)  * part_count * 2);
@@ -2621,7 +2621,7 @@ double pllmod_algo_opt_rates_weights_networkinfo (pllmod_networkinfo_t * network
 
   /* nothing to optimize */
   if (!part_count)
-    return -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0);
+    return -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
 
   /* IMPORTANT: we need to know max_free_params among all threads! */
   if (networkinfo->parallel_reduce_cb)
@@ -2672,7 +2672,7 @@ double pllmod_algo_opt_rates_weights_networkinfo (pllmod_networkinfo_t * network
   fix_free_rates_network(networkinfo, min_rate, max_rate);
 
   /* 2 step BFGS */
-  cur_logl = -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0);
+  cur_logl = -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
   DBG("pllmod_algo_opt_rates_weights_networkinfo: START: logLH = %.15lf\n", cur_logl);
   do
   {
@@ -2713,7 +2713,7 @@ double pllmod_algo_opt_rates_weights_networkinfo (pllmod_networkinfo_t * network
                                                 (void *) &opt_params,
                                                 target_func_multidim_treeinfo);
 
-    DBG("pllmod_algo_opt_rates_weights_treeinfo: AFTER WEIGHTS: logLH = %.15lf\n", cur_logl);
+    DBG("pllmod_algo_opt_rates_weights_networkinfo: AFTER WEIGHTS: logLH = %.15lf\n", cur_logl);
 
     /* optimize mixture rates */
 
@@ -2733,7 +2733,7 @@ double pllmod_algo_opt_rates_weights_networkinfo (pllmod_networkinfo_t * network
 
         num_free_params[part] = partition->rate_cats;
 
-        DBG("pllmod_algo_opt_rates_weights_treeinfo: OLD RATES = (%.12lf %.12lf %.12lf %.12lf)\n",
+        DBG("pllmod_algo_opt_rates_weights_networkinfo: OLD RATES = (%.12lf %.12lf %.12lf %.12lf)\n",
             partition->rates[0], partition->rates[1], partition->rates[2], partition->rates[3]);
 
         fill_rates (partition->rates,
@@ -2754,7 +2754,7 @@ double pllmod_algo_opt_rates_weights_networkinfo (pllmod_networkinfo_t * network
                                                 (void *) &opt_params,
                                                 target_func_multidim_treeinfo);
 
-    DBG("pllmod_algo_opt_rates_weights_treeinfo: AFTER RATES: logLH = %.15lf\n", cur_logl);
+    DBG("pllmod_algo_opt_rates_weights_networkinfo: AFTER RATES: logLH = %.15lf\n", cur_logl);
   }
   while (prev_logl - cur_logl > tolerance);
 
@@ -2783,7 +2783,7 @@ double pllmod_algo_opt_rates_weights_networkinfo (pllmod_networkinfo_t * network
   }
 
   /* update pmatrices and partials according to the new branches */
-  cur_logl = pllmod_networkinfo_compute_loglh(networkinfo, 0);
+  cur_logl = pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
 
   /* cleanup */
   for (i = 0; i < part_count; ++i)
