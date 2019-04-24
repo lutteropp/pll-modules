@@ -91,6 +91,22 @@ static void algo_query_allnodes_recursive(pll_unode_t * node,
   }
 }
 
+static void algo_query_allnodes_recursive_network(pll_unetwork_node_t * node,
+                                          pll_unetwork_node_t ** buffer,
+                                          int * index)
+{
+  if (node->next)
+  {
+	algo_query_allnodes_recursive_network(node->next->back, buffer, index);
+	algo_query_allnodes_recursive_network(node->next->next->back, buffer, index);
+
+    buffer[(*index)++] = node->next->next;
+    buffer[(*index)++] = node->next;
+    buffer[(*index)++] = node;
+  }
+}
+
+
 static int algo_query_allnodes(pll_unode_t * root, pll_unode_t ** buffer)
 {
   assert(root && buffer);
@@ -99,6 +115,18 @@ static int algo_query_allnodes(pll_unode_t * root, pll_unode_t ** buffer)
 
   algo_query_allnodes_recursive(root->back, buffer, &index);
   algo_query_allnodes_recursive(root, buffer, &index);
+
+  return index;
+}
+
+static int algo_query_allnodes_network(pll_unetwork_node_t * root, pll_unetwork_node_t ** buffer)
+{
+  assert(root && buffer);
+
+  int index = 0;
+
+  algo_query_allnodes_recursive_network(root->back, buffer, &index);
+  algo_query_allnodes_recursive_network(root, buffer, &index);
 
   return index;
 }
@@ -1277,6 +1305,365 @@ PLL_EXPORT double pllmod_algo_spr_round(pllmod_treeinfo_t * treeinfo,
 
   /* update partials and CLVs */
   loglh = pllmod_treeinfo_compute_loglh(treeinfo, 0);
+  if (fabs(loglh - best_lh) > 1e-6)
+  {
+    printf("LH mismatch: %.12f  != %.12f\n", best_lh, loglh);
+    assert(fabs(loglh - best_lh) < 1e-6);
+  }
+
+  return loglh;
+
+error_exit:
+  /* cleanup */
+  if (allnodes)
+    free(allnodes);
+  if (rollback2)
+    free(rollback2);
+  algo_bestnode_list_destroy(bestnode_list);
+  algo_rollback_list_destroy(rollback_list);
+
+  /* make sure libpll error code is set and exit */
+  assert(pll_errno);
+  return 0;
+}
+
+PLL_EXPORT double pllmod_algo_spr_round_networkinfo(pllmod_networkinfo_t * networkinfo,
+                                        int radius_min,
+                                        int radius_max,
+                                        int ntopol_keep,
+                                        int thorough,
+                                        int brlen_opt_method,
+                                        double bl_min,
+                                        double bl_max,
+                                        int smoothings,
+                                        double epsilon,
+                                        cutoff_info_t * cutoff_info,
+                                        double subtree_cutoff)
+{
+  unsigned int i;
+  double loglh, best_lh;
+  pllmod_search_params_t params;
+  int retval;
+  int brlen_unlinked;
+
+  int allnodes_count;
+  pll_unetwork_node_t ** allnodes = NULL;
+
+  size_t rollback_slots;
+  size_t toplist_slots;
+  size_t brlen_set_count;
+  pllmod_rollback_list_t * rollback_list = NULL;
+  pllmod_bestnode_list_t * bestnode_list = NULL;
+  pll_tree_rollback_t * rollback;
+  size_t rollback_counter;
+  pll_tree_rollback_t * rollback2 = NULL;
+  int toplist_index;
+
+  node_entry_t * spr_entry;
+  pll_unetwork_node_t * p_edge, * r_edge;
+
+  pllmod_networkinfo_topology_t * best_topol = NULL;
+#ifndef  PLLMOD_SEARCH_GREEDY_BLO
+  pllmod_treeinfo_topology_t * tmp_topol = NULL;
+#endif
+
+  double static_brlen_buf[BRLEN_BUF_COUNT];
+
+  /* process search params */
+  params.thorough = thorough;
+  params.ntopol_keep = ntopol_keep;
+  params.radius_min = radius_min;
+  params.radius_max = radius_max;
+  params.bl_min = bl_min;
+  params.bl_max = bl_max;
+  params.smoothings = smoothings;
+  params.brlen_opt_method = brlen_opt_method;
+
+  brlen_unlinked = (networkinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED) ? 1 : 0;
+
+  /* reset error */
+  pll_errno = 0;
+
+  /* allocate brlen buffers */
+  for (i = 0; i < BRLEN_BUF_COUNT; ++i)
+  {
+    params.brlen_buf[i] = brlen_unlinked ?
+            (double *) calloc(networkinfo->init_partition_count, sizeof(double)) :
+            &static_brlen_buf[i];
+  }
+
+  /* allocate rollback_info slots */
+  rollback_slots = params.ntopol_keep;
+  rollback_list = algo_rollback_list_create(rollback_slots);
+  if (!rollback_list)
+  {
+    /* return and spread error */
+    goto error_exit;
+  }
+
+  /* allocate best node slots */
+  toplist_slots = params.thorough ? params.ntopol_keep : params.ntopol_keep * 3;
+  brlen_set_count = brlen_unlinked ? networkinfo->init_partition_count : 1;
+  bestnode_list = algo_bestnode_list_create(toplist_slots, brlen_set_count);
+  if (!bestnode_list)
+  {
+    /* return and spread error */
+    goto error_exit;
+  }
+
+  if (cutoff_info)
+  {
+    cutoff_info->lh_dec_count = 0;
+    cutoff_info->lh_dec_sum = 0.;
+  }
+
+  loglh   = pllmod_networkinfo_compute_loglh(networkinfo, 0);
+  best_lh = loglh;
+
+  /* query all nodes */
+  allnodes_count = (networkinfo->tip_count - 2) * 3;
+  allnodes = (pll_unetwork_node_t **) calloc ((size_t) allnodes_count,
+                                      sizeof(pll_unetwork_node_t *));
+  if (!allnodes)
+  {
+    pllmod_set_error(PLL_ERROR_MEM_ALLOC,
+                     "Cannot allocate memory nodes list\n");
+    goto error_exit;
+  }
+
+  int node_count = algo_query_allnodes_network(networkinfo->root, allnodes);
+  assert(node_count == allnodes_count);
+
+  loglh = reinsert_nodes(networkinfo,
+                         allnodes,
+                         allnodes_count,
+                         rollback_list,
+                         bestnode_list,
+                         cutoff_info,
+                         &params);
+  if (!loglh)
+  {
+    /* return and spread error */
+    goto error_exit;
+  }
+
+  /* in FAST mode, we re-insert a subset of best-scoring subtrees with BLO
+   * (i.e., in SLOW mode) */
+  if (!params.thorough && bestnode_list->current > 0)
+  {
+    params.thorough = 1;
+    for (i = 0; bestnode_list->list[i].p_node != NULL; i++)
+    {
+      allnodes[i] = bestnode_list->list[i].p_node;
+      bestnode_list->list[i].p_node = NULL;
+    }
+
+    DBG("\nThorough re-insertion of %d best-scoring nodes...\n", i);
+
+    loglh = reinsert_nodes(networkinfo,
+                           allnodes,
+                           i,
+                           rollback_list,
+                           bestnode_list,
+                           cutoff_info,
+                           &params);
+    if (!loglh)
+    {
+      /* return and spread error */
+      goto error_exit;
+    }
+  }
+
+  free(allnodes);
+  allnodes = NULL;
+
+  best_lh = algo_optimize_bl_all(networkinfo,
+                                 &params,
+                                 epsilon,
+                                 0.25);
+  DBG("Best tree LH after BLO: %f\n", best_lh);
+
+  best_topol = pllmod_treeinfo_get_topology(networkinfo, NULL);
+  if (!best_topol)
+    goto error_exit;
+
+  /* Restore best topologies and re-evaluate them after full BLO.
+  NOTE: some SPRs were applied (if they improved LH) and others weren't.
+  Therefore in order to restore the original topology, we need to either rollback
+  an SPR (if it was already applied), or re-do it again (if it wasn't applied).
+  We perform it by simultaneously iterating over the history of applied SPRs
+  (rollback_list) and over the list of not-applied SPRs which resulted
+  in topologies with the highest LH (bestnode_list).
+  */
+  rollback_counter = 0;
+  toplist_index = -1;
+  rollback2 = (pll_tree_rollback_t *) calloc(1, sizeof(pll_tree_rollback_t));
+  if (!rollback2)
+  {
+    pllmod_set_error(PLL_ERROR_MEM_ALLOC,
+                     "Cannot allocate memory for additional rollback list\n");
+    goto error_exit;
+  }
+  int undo_SPR = 0;
+
+  while (rollback_counter < rollback_list->size)
+  {
+    const int rollback_num = algo_rollback_list_abspos(rollback_list);
+    toplist_index = algo_bestnode_list_next_index(bestnode_list,
+                                                  rollback_num,
+                                                  toplist_index);
+
+    if (toplist_index == -1)
+    {
+      /* no more topologies for this rollback, so we go one slot back */
+      rollback = algo_rollback_list_prev(rollback_list);
+
+      if (!rollback || !rollback->SPR.prune_edge)
+      {
+        DBG("  Rollback slot %d is empty, exiting the loop...\n",
+            rollback_list->current);
+        break;
+      }
+
+      DBG("  Rollback BL: %.12lf %.12lf %.12lf %.12lf\n\n", rollback->SPR.prune_bl,
+          rollback->SPR.prune_left_bl, rollback->SPR.prune_right_bl, rollback->SPR.regraft_bl);
+
+      DBG("  Undoing SPR %lu (slot %d)... ", rollback_counter,
+          rollback_list->current);
+
+      retval = pllmod_tree_rollback(rollback);
+      assert(retval == PLL_SUCCESS);
+
+      rollback_counter++;
+
+      undo_SPR = 0;
+    }
+    else
+    {
+      if (toplist_index > params.ntopol_keep)
+        continue;
+
+      spr_entry = &bestnode_list->list[toplist_index];
+      p_edge = spr_entry->p_node;
+      r_edge = spr_entry->r_node;
+
+      if (!p_edge)
+      {
+        DBG("    SPR slot %d is empty, exiting the loop...\n", toplist_index);
+        break;
+      }
+      else
+      {
+        DBG("    Evaluating topology %d (idx %d, clv %d -> idx %d, clv %d), old LH: %f... ",
+            toplist_index,
+            p_edge->node_index,
+            p_edge->clv_index,
+            r_edge->node_index,
+            r_edge->clv_index,
+            spr_entry->lh);
+      }
+
+      if (!pllmod_networkinfo_check_constraint(networkinfo, p_edge, r_edge))
+      {
+        DBG("Topological constraint check failed, skip the topology.\n");
+        continue;
+      }
+
+      /* re-apply best SPR move for the node */
+      retval = pllmod_utree_spr(p_edge, r_edge, rollback2);
+      assert(retval == PLL_SUCCESS);
+
+#ifndef  PLLMOD_SEARCH_GREEDY_BLO
+      /* save topology with original branch length before BLO */
+      tmp_topol = pllmod_networkinfo_get_topology(treeinfo, tmp_topol);
+#endif
+
+      /* make sure that original prune branch length does not exceed maximum */
+      algo_unode_fix_length(networkinfo, rollback2->SPR.regraft_edge, params.bl_min, params.bl_max);
+
+      /* restore optimized branch lengths */
+      pllmod_networkinfo_set_branch_length_all(networkinfo, p_edge, spr_entry->b1);
+      pllmod_networkinfo_set_branch_length_all(networkinfo, p_edge->next, spr_entry->b2);
+      pllmod_networkinfo_set_branch_length_all(networkinfo, p_edge->next->next, spr_entry->b3);
+
+      undo_SPR = 1;
+    }
+
+    /* now optimize all the branches */
+    double loglh;
+    loglh = algo_optimize_bl_all(networkinfo,
+                                 &params,
+                                 epsilon,
+                                 0.25);
+
+    if (!loglh)
+    {
+      /* return and spread error */
+      goto error_exit;
+    }
+
+    DBG("  new LH after BLO: %f\n", loglh);
+    assert(loglh > -INFINITY);
+
+    if (loglh - best_lh > 0.01)
+    {
+      DBG("Best tree LH: %f\n", loglh);
+
+      best_topol = pllmod_networkinfo_get_topology(networkinfo, best_topol);
+      if (!best_topol)
+        goto error_exit;
+
+      best_lh = loglh;
+    }
+
+    if (undo_SPR)
+    {
+#ifndef  PLLMOD_SEARCH_GREEDY_BLO
+      /* restore original brlens */
+      retval = pllmod_networkinfo_set_topology(networkinfo, tmp_topol);
+      if (!retval)
+        goto error_exit;
+#endif
+
+      /* rollback the SPR */
+      retval = pllmod_tree_rollback(rollback2);
+      assert(retval == PLL_SUCCESS);
+    }
+  }
+
+  free(rollback2);
+
+  algo_bestnode_list_destroy(bestnode_list);
+  algo_rollback_list_destroy(rollback_list);
+
+  if (brlen_unlinked)
+  {
+    for (i = 0; i < BRLEN_BUF_COUNT; ++i)
+      free(params.brlen_buf[i]);
+  }
+
+  /* update LH cutoff */
+  if (cutoff_info)
+  {
+    cutoff_info->lh_cutoff =
+        subtree_cutoff * (cutoff_info->lh_dec_sum / cutoff_info->lh_dec_count);
+  }
+
+  if (best_topol)
+  {
+    retval = pllmod_networkinfo_set_topology(networkinfo, best_topol);
+    pllmod_networkinfo_destroy_topology(best_topol);
+    if (!retval)
+      goto error_exit;
+  }
+
+#ifndef  PLLMOD_SEARCH_GREEDY_BLO
+  if (tmp_topol)
+    pllmod_treeinfo_destroy_topology(tmp_topol);
+#endif
+
+  /* update partials and CLVs */
+  loglh = pllmod_networkinfo_compute_loglh(networkinfo, 0);
   if (fabs(loglh - best_lh) > 1e-6)
   {
     printf("LH mismatch: %.12f  != %.12f\n", best_lh, loglh);

@@ -117,6 +117,14 @@ typedef struct consensus_utree_t
   unsigned int branch_count;
 } pll_consensus_utree_t;
 
+typedef struct consensus_unetwork_t
+{
+  pll_unetwork_node_t * network;
+  pll_consensus_data_t * branch_data;
+  unsigned int tip_count;
+  unsigned int branch_count;
+} pll_consensus_unetwork_t;
+
 typedef struct string_hash_entry
 {
   hash_key_t key;
@@ -304,6 +312,11 @@ PLL_EXPORT int pllmod_utree_draw_support(pll_utree_t * ref_tree,
                                          pll_unode_t ** node_map,
                                          char * (*cb_serialize)(double));
 
+PLL_EXPORT int pllmod_unetwork_draw_support(pll_unetwork_t * ref_network,
+                                         const double * support,
+                                         pll_unetwork_node_t ** node_map,
+                                         char * (*cb_serialize)(double));
+
 
 /* Topological operations */
 
@@ -430,6 +443,10 @@ PLL_EXPORT pll_split_t * pllmod_utree_split_create(const pll_unode_t * tree,
                                                    unsigned int tip_count,
                                                    pll_unode_t ** split_to_node_map);
 
+PLL_EXPORT pll_split_t * pllmod_unetwork_split_create(const pll_unetwork_node_t * tree,
+                                                   unsigned int tip_count,
+                                                   pll_unetwork_node_t ** split_to_node_map);
+
 PLL_EXPORT pll_split_t pllmod_utree_split_from_tips(unsigned int * subtree_tip_ids,
                                                     unsigned int subtree_size,
                                                     unsigned int tip_count);
@@ -493,6 +510,11 @@ PLL_EXPORT pll_consensus_utree_t * pllmod_utree_from_splits(
                                         unsigned int tip_count,
                                         char * const * tip_labels);
 
+PLL_EXPORT pll_consensus_unetwork_t * pllmod_unetwork_from_splits(
+                                        const pll_split_system_t * split_system,
+                                        unsigned int tip_count,
+                                        char * const * tip_labels);
+
 PLL_EXPORT pll_split_system_t * pllmod_utree_split_consensus(
                                                 bitv_hashtable_t * splits_hash,
                                                 unsigned int tip_count,
@@ -512,6 +534,8 @@ PLL_EXPORT pll_consensus_utree_t * pllmod_utree_consensus(
 PLL_EXPORT void pllmod_utree_split_system_destroy(pll_split_system_t * split_system);
 
 PLL_EXPORT void pllmod_utree_consensus_destroy(pll_consensus_utree_t * tree);
+
+PLL_EXPORT void pllmod_unetwork_consensus_destroy(pll_consensus_unetwork_t * network);
 
 
 /* Additional utilities */

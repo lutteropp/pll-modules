@@ -25,17 +25,21 @@ static void reverse_split(pll_split_t split, unsigned int tip_count);
 static int is_subsplit(pll_split_t child,
                        pll_split_t parent,
                        unsigned int split_len);
-static pll_unode_t * find_splitnode_recurse(pll_split_t split,
-                                            pll_unode_t * root,
-                                            unsigned int split_len);
 static int get_split_id(pll_split_t split,
                         unsigned int split_len);
 static pll_unode_t * create_consensus_node(pll_unode_t * parent,
                                            pll_split_t split,
                                            double support,
                                            unsigned int split_len);
+static pll_unetwork_node_t * create_consensus_node_network(pll_unetwork_node_t * parent,
+                                           pll_split_t split,
+                                           double support,
+                                           unsigned int split_len);
 static pll_unode_t * find_splitnode_recurse(pll_split_t split,
                                             pll_unode_t * root,
+                                            unsigned int split_len);
+static pll_unetwork_node_t * find_splitnode_recurse_network(pll_split_t split,
+                                            pll_unetwork_node_t * root,
                                             unsigned int split_len);
 static pll_split_t clone_split(const pll_split_t from,
                                unsigned int split_len);
@@ -43,9 +47,18 @@ static void recursive_assign_indices(pll_unode_t * node,
                                      unsigned int * inner_clv_index,
                                      int * inner_scaler_index,
                                      unsigned int * inner_node_index);
+static void recursive_assign_indices_network(pll_unetwork_node_t * node,
+                                     unsigned int * inner_clv_index,
+                                     int * inner_scaler_index,
+                                     unsigned int * inner_node_index);
 static void reset_template_indices(pll_unode_t * node,
                                    unsigned int tip_count);
+static void reset_template_indices_network(pll_unetwork_node_t * node,
+                                   unsigned int tip_count);
 static void build_tips_recurse(pll_unode_t * tree,
+                               char * const *tip_labels,
+                               unsigned int split_len);
+static void build_tips_recurse_network(pll_unetwork_node_t * tree,
                                char * const *tip_labels,
                                unsigned int split_len);
 static void consensus_data_destroy(void * data, int destroy_split);
@@ -53,8 +66,11 @@ static void consensus_data_destroy(void * data, int destroy_split);
 static void fill_consensus_recurse(pll_consensus_utree_t * consensus_tree,
                                    pll_unode_t * node,
                                    unsigned int * cur_branch);
+static void fill_consensus_recurse_network(pll_consensus_unetwork_t * consensus_network,
+                                   pll_unetwork_node_t * node,
+                                   unsigned int * cur_branch);
 static void fill_consensus(pll_consensus_utree_t * consensus_tree);
-
+static void fill_consensus_network(pll_consensus_unetwork_t * consensus_network);
 
 
 
@@ -264,6 +280,166 @@ PLL_EXPORT pll_consensus_utree_t * pllmod_utree_from_splits(
 
   /* return_tree == tree if success, or null if the algorithm failed */
   return return_tree;
+}
+
+PLL_EXPORT pll_consensus_unetwork_t * pllmod_unetwork_from_splits(
+                                      const pll_split_system_t * split_system,
+                                      unsigned int tip_count,
+                                      char * const * tip_labels)
+{
+  const pll_split_t * splits = split_system->splits;
+  unsigned int split_size = sizeof(pll_split_base_t) * 8;
+  unsigned int split_len  = bitv_length(tip_count);
+  unsigned int i;
+  pll_unetwork_node_t * network, * next_parent;
+  pll_consensus_unetwork_t * return_network;
+  pll_split_t rootsplit1, rootsplit2, next_split;
+  double * support_values;
+  pll_split_t * all_splits;
+
+  return_network = (pll_consensus_unetwork_t *) malloc (sizeof(pll_consensus_unetwork_t));
+
+  if (!return_network)
+  {
+    pllmod_set_error(PLL_ERROR_MEM_ALLOC,
+                     "Cannot allocate memory for consensus tree!");
+    return NULL;
+  }
+
+  return_network->tip_count = tip_count;
+  return_network->branch_count = split_system->split_count;
+  return_network->branch_data = (pll_consensus_data_t * ) malloc (return_network->branch_count * sizeof(pll_consensus_data_t));
+
+  if (!return_network->branch_data)
+  {
+    free(return_network);
+    pllmod_set_error(PLL_ERROR_MEM_ALLOC,
+                     "Cannot allocate memory for consensus tree!");
+    return NULL;
+  }
+
+  if (split_system->split_count == 0)
+  {
+    // build star tree
+    rootsplit1 = (pll_split_t) calloc(split_len,
+                                      sizeof(pll_split_base_t));
+    rootsplit1[0] = 1;
+    rootsplit2 = clone_split(rootsplit1, split_len);
+    reverse_split(rootsplit1, tip_count);
+
+    network = create_consensus_node_network(NULL, rootsplit1, 1.0, split_len);
+    network->back = create_consensus_node_network(NULL, rootsplit2, 1.0, split_len);
+    network->back->back = network;
+
+    for (i=1; i<tip_count; ++i)
+    {
+      unsigned int split_id   = i / split_size;
+      next_split = (pll_split_t) calloc(split_len,
+                                        sizeof(pll_split_base_t));
+      next_split[split_id] = (1 << (i % split_size));
+      pll_unetwork_node_t * next_n = create_consensus_node_network(network,
+                                                   next_split,
+                                                   1.0,
+                                                   split_len);
+      assert(next_n);
+    }
+
+    return_network->network = network;
+  }
+  else
+  {
+    all_splits = (pll_split_t *) malloc((split_system->split_count + tip_count) *
+                                                      sizeof(pll_split_t));
+    support_values = (double *) malloc((split_system->split_count + tip_count) *
+                                                      sizeof(double));
+    memcpy(all_splits, splits, split_system->split_count * sizeof(pll_split_t));
+
+    /* fill trivial splits */
+    for (i=0; i<tip_count; ++i)
+    {
+      support_values[split_system->split_count+i] = 1.0;
+      all_splits[split_system->split_count+i] = (pll_split_t) calloc(split_len,
+                                                 sizeof(pll_split_base_t));
+      {
+        unsigned int split_id   = i / split_size;
+        all_splits[split_system->split_count+i][split_id] = (1 << (i % split_size));
+      }
+    }
+
+    /* compute support for other splits */
+    if (split_system->support)
+      for (i=0; i<split_system->split_count; ++i)
+        support_values[i] = 1.0 * split_system->support[i] / split_system->max_support;
+    else
+      for (i=0; i<split_system->split_count; ++i)
+        support_values[i] = 1.0 * split_system->max_support;
+
+    /* create initial tree with 2 connected nodes of degree 1 */
+    rootsplit1 = clone_split(all_splits[0], split_len);
+    rootsplit2 = clone_split(all_splits[0], split_len);
+    reverse_split(rootsplit2, tip_count);
+
+    /* build tree out of the first split */
+    network = create_consensus_node_network(NULL, rootsplit1, support_values[0], split_len);
+    network->back = create_consensus_node_network(NULL, rootsplit2, support_values[0], split_len);
+    network->back->back = network;
+
+    return_network->network = network;
+
+    /* add splits individually */
+    for (i=1; i<(split_system->split_count+tip_count); ++i)
+    {
+      next_split = clone_split(all_splits[i], split_len);
+
+      /* select branch */
+      if (is_subsplit(next_split, rootsplit1, split_len))
+        next_parent = network;
+      else if (is_subsplit(next_split, rootsplit2, split_len))
+        next_parent = network->back;
+      else
+      {
+        reverse_split(next_split, tip_count);
+        if (is_subsplit(next_split, rootsplit1, split_len))
+          next_parent = network;
+        else if (is_subsplit(next_split, rootsplit2, split_len))
+          next_parent = network->back;
+        else
+        {
+          pllmod_set_error(PLLMOD_TREE_ERROR_INVALID_SPLIT,
+                           "Splits are incompatible");
+          free(return_network);
+          return_network = NULL;
+          break;
+        }
+      }
+
+      /* select node */
+      next_parent = find_splitnode_recurse_network(next_split, next_parent, split_len);
+      assert(next_parent);
+
+      /* create new node for the split*/
+      create_consensus_node_network(next_parent, next_split, support_values[i], split_len);
+    }
+
+    /* clean */
+    for (i=0; i<tip_count; ++i)
+      free(all_splits[split_system->split_count+i]);
+    free(all_splits);
+    free(support_values);
+    free(rootsplit1);
+  }
+
+  build_tips_recurse_network(network, tip_labels, split_len);
+  if (network->back)
+    build_tips_recurse_network(network->back, tip_labels, split_len);
+
+  reset_template_indices_network(network, tip_count);
+
+  if (return_network)
+    fill_consensus_network(return_network);
+
+  /* return_network == network if success, or null if the algorithm failed */
+  return return_network;
 }
 
 PLL_EXPORT pll_split_system_t * pllmod_utree_split_consensus(
@@ -655,6 +831,31 @@ static void dealloc_graph_recursive(pll_unode_t * node)
   free(node);
 }
 
+static void dealloc_graph_recursive_network(pll_unetwork_node_t * node)
+{
+  if (node->label)
+    free(node->label);
+  if (node->reticulation_name)
+	free(node->reticulation_name);
+
+  if (!node->next)
+  {
+    free(node);
+    return;
+  }
+
+  pll_unetwork_node_t * sibling = node->next;
+  while (node != sibling)
+  {
+	pll_unetwork_node_t * cur_node = sibling;
+    dealloc_graph_recursive_network(cur_node->back);
+    sibling = sibling->next;
+    free(cur_node);
+  }
+
+  free(node);
+}
+
 PLL_EXPORT void pllmod_utree_split_system_destroy(pll_split_system_t * split_system)
 {
   unsigned int i;
@@ -681,6 +882,23 @@ PLL_EXPORT void pllmod_utree_consensus_destroy(pll_consensus_utree_t * tree)
 
   /* dealloc tree */
   free(tree);
+}
+
+PLL_EXPORT void pllmod_unetwork_consensus_destroy(pll_consensus_unetwork_t * network)
+{
+  unsigned int i;
+
+  /* dealloc branch data */
+  for (i=0; i<network->branch_count; ++i)
+    free(network->branch_data[i].split);
+  free(network->branch_data);
+
+  /* dealloc network structure */
+  dealloc_graph_recursive_network(network->network->back);
+  dealloc_graph_recursive_network(network->network);
+
+  /* dealloc network */
+  free(network);
 }
 
 
@@ -975,6 +1193,46 @@ static void build_tips_recurse(pll_unode_t * tree,
   }
 }
 
+static void build_tips_recurse_network(pll_unetwork_node_t * tree,
+                               char * const * tip_labels,
+                               unsigned int split_len)
+{
+  pll_consensus_data_t * data = (pll_consensus_data_t *) tree->data;
+  pll_unetwork_node_t * next_root;
+
+  next_root = tree->next;
+  if (next_root == tree)
+  {
+    assert(data);
+    /* create tips */
+    int tip_id = get_split_id(data->split,
+                              split_len);
+
+    assert (tip_id != -1);
+
+    if (tip_labels)
+    {
+      tree->label = (char *) malloc(strlen(tip_labels[tip_id])+1);
+      strcpy(tree->label, tip_labels[tip_id]);
+    }
+    else
+    {
+      tree->label = NULL;
+    }
+    tree->node_index = (unsigned int) tip_id;
+    tree->next = NULL;
+  }
+  else
+  {
+    while (next_root != tree)
+    {
+      /* recurse next branch */
+      build_tips_recurse_network(next_root->back, tip_labels, split_len);
+      next_root = next_root->next;
+    }
+  }
+}
+
 static pll_unode_t * find_splitnode_recurse(pll_split_t split,
                                             pll_unode_t * root,
                                             unsigned int split_len)
@@ -989,6 +1247,35 @@ static pll_unode_t * find_splitnode_recurse(pll_split_t split,
     while(next_root != root)
     {
       if ((ret_node = find_splitnode_recurse(split,
+                                 next_root->back,
+                                 split_len)) != NULL)
+      {
+        return ret_node;
+      }
+      next_root = next_root->next;
+    }
+    return root;
+  }
+  else
+  {
+    return NULL;
+  }
+}
+
+static pll_unetwork_node_t * find_splitnode_recurse_network(pll_split_t split,
+                                            pll_unetwork_node_t * root,
+                                            unsigned int split_len)
+{
+	pll_unetwork_node_t * next_root, * ret_node;
+  pll_consensus_data_t * data = (pll_consensus_data_t *) root->data;
+
+  if (is_subsplit(split, data->split, split_len))
+  {
+    /* check children */
+    next_root = root->next;
+    while(next_root != root)
+    {
+      if ((ret_node = find_splitnode_recurse_network(split,
                                  next_root->back,
                                  split_len)) != NULL)
       {
@@ -1058,6 +1345,60 @@ static void connect_consensus_node(pll_unode_t * parent,
 
 }
 
+static void connect_consensus_node_network(pll_unetwork_node_t * parent,
+                                   pll_unetwork_node_t * child,
+                                   unsigned int split_len,
+                                   int auto_rearrange)
+{
+  pll_consensus_data_t * data_p, * data_c, * data_aux;
+  pll_unetwork_node_t * new_node, * aux_node, * aux_node2;
+  data_p = (pll_consensus_data_t *) parent->data;
+  data_c = (pll_consensus_data_t *) child->data;
+
+  assert(is_subsplit(data_c->split, data_p->split, split_len));
+  if (child->back)
+  {
+    new_node = child->back;
+
+    /* disconnect from parent */
+    aux_node = new_node;
+    assert(new_node->next != new_node);
+    while(aux_node->next != child->back) aux_node = aux_node->next;
+
+    aux_node->next = new_node->next;
+    new_node->next = 0;
+  }
+  else
+  {
+    new_node = (pll_unetwork_node_t *) malloc (sizeof(pll_unetwork_node_t));
+  }
+
+  if (auto_rearrange)
+  {
+    aux_node = parent->next;
+    while (aux_node != parent)
+    {
+      aux_node2 = aux_node->next;
+      data_aux = (pll_consensus_data_t *) aux_node->back->data;
+      if (is_subsplit(data_aux->split, data_c->split, split_len))
+      {
+        connect_consensus_node_network(child, aux_node->back, split_len, 0);
+      }
+      aux_node = aux_node2;
+    }
+  }
+
+  /* connect new node */
+  new_node->data = data_p;
+  new_node->next = parent->next;
+  parent->next = new_node;
+
+  /* connect child */
+  new_node->back = child;
+  child->back = new_node;
+
+}
+
 static pll_unode_t * create_consensus_node(pll_unode_t * parent,
                                            pll_split_t split,
                                            double support,
@@ -1083,6 +1424,36 @@ static pll_unode_t * create_consensus_node(pll_unode_t * parent,
   if (parent)
   {
     connect_consensus_node(parent, new_node, split_len, 1);
+  }
+
+  return new_node;
+}
+
+static pll_unetwork_node_t * create_consensus_node_network(pll_unetwork_node_t * parent,
+                                           pll_split_t split,
+                                           double support,
+                                           unsigned int split_len)
+{
+  pll_unetwork_node_t * new_node = (pll_unetwork_node_t *) malloc (sizeof(pll_unetwork_node_t));
+  pll_consensus_data_t * data = 0;
+
+  if (support>0)
+  {
+    data = (pll_consensus_data_t *)  malloc (sizeof(pll_consensus_data_t));
+    data->split     = split;
+    data->support   = support;
+  }
+
+  new_node->data  = data;
+  new_node->label = NULL;
+  new_node->back = NULL;
+
+  /* self link */
+  new_node->next = new_node;
+
+  if (parent)
+  {
+    connect_consensus_node_network(parent, new_node, split_len, 1);
   }
 
   return new_node;
@@ -1173,6 +1544,58 @@ static void recursive_assign_indices(pll_unode_t * node,
   *inner_node_index = *inner_node_index + 3;
 }
 
+static void recursive_assign_indices_network(pll_unetwork_node_t * node,
+                                    unsigned int * inner_clv_index,
+                                    int * inner_scaler_index,
+                                    unsigned int * inner_node_index)
+{
+  if (!node)
+    return;
+
+  if (!node->active)
+	return;
+
+  if (!node->next)
+  {
+    node->clv_index = node->node_index;
+    node->pmatrix_index = node->node_index;
+    node->scaler_index = PLL_SCALE_BUFFER_NONE;
+    return;
+  }
+
+  pll_unetwork_node_t * sibling = node->next;
+  while (sibling != node)
+  {
+	if (sibling->active) {
+      recursive_assign_indices_network(sibling->back,
+                               inner_clv_index,
+                               inner_scaler_index,
+                               inner_node_index);
+	}
+    sibling = sibling->next;
+  }
+
+  node->node_index = *inner_node_index;
+  node->next->node_index = *inner_node_index + 1;
+  node->next->next->node_index = *inner_node_index + 2;
+
+  node->clv_index = *inner_clv_index;
+  node->next->clv_index = *inner_clv_index;
+  node->next->next->clv_index = *inner_clv_index;
+
+  node->pmatrix_index = *inner_clv_index;
+  node->next->pmatrix_index = node->next->back->pmatrix_index;
+  node->next->next->pmatrix_index = node->next->next->back->pmatrix_index;
+
+  node->scaler_index = *inner_scaler_index;
+  node->next->scaler_index = *inner_scaler_index;
+  node->next->next->scaler_index = *inner_scaler_index;
+
+  *inner_clv_index = *inner_clv_index + 1;
+  *inner_scaler_index = *inner_scaler_index + 1;
+  *inner_node_index = *inner_node_index + 3;
+}
+
 static void reset_template_indices(pll_unode_t * node,
                                    unsigned int tip_count)
 {
@@ -1196,6 +1619,54 @@ static void reset_template_indices(pll_unode_t * node,
   while(sibling != node)
   {
     recursive_assign_indices(sibling->back,
+                             &inner_clv_index,
+                             &inner_scaler_index,
+                             &inner_node_index);
+    sibling = sibling->next;
+  }
+
+  node->node_index   = inner_node_index++;
+  node->clv_index    = inner_clv_index;
+  node->scaler_index = inner_scaler_index;
+
+  sibling = node->next;
+  while(sibling != node)
+  {
+    sibling->node_index = inner_node_index;
+    sibling->clv_index = inner_clv_index;
+    sibling->scaler_index = inner_scaler_index;
+    inner_node_index++;
+
+    if (sibling->back)
+      sibling->pmatrix_index = sibling->back->pmatrix_index;
+
+    sibling = sibling->next;
+  }
+}
+
+static void reset_template_indices_network(pll_unetwork_node_t * node,
+                                   unsigned int tip_count)
+{
+  unsigned int inner_clv_index = tip_count;
+  unsigned int inner_node_index = tip_count;
+  int inner_scaler_index = 0;
+
+  if (node_is_leaf(node))
+  {
+    node = node->back;
+    assert(!node_is_leaf(node));
+  }
+
+  if (node->back)
+    recursive_assign_indices_network(node->back,
+                             &inner_clv_index,
+                             &inner_scaler_index,
+                             &inner_node_index);
+
+  pll_unetwork_node_t * sibling = node->next;
+  while(sibling != node)
+  {
+    recursive_assign_indices_network(sibling->back,
                              &inner_clv_index,
                              &inner_scaler_index,
                              &inner_node_index);
@@ -1270,6 +1741,47 @@ static void fill_consensus_recurse(pll_consensus_utree_t * consensus_tree,
   }
 }
 
+static void fill_consensus_recurse_network(pll_consensus_unetwork_t * consensus_network,
+                                   pll_unetwork_node_t * node,
+                                   unsigned int * cur_branch)
+{
+  assert(consensus_network);
+  assert(cur_branch);
+  assert(node);
+
+  pll_unetwork_node_t * child;
+  unsigned int max_degree = consensus_network->tip_count;
+
+  if (node_is_leaf(node))
+  {
+    /* free tip data pointer */
+    consensus_data_destroy(node->data, 1);
+
+    /* unlink connected data pointer */
+    node->back->data = 0;
+    return;
+  }
+
+  child = node->next;
+  while(child != node)
+  {
+    /* prevent infinite loop */
+    --max_degree;
+    assert(max_degree);
+
+    fill_consensus_recurse_network(consensus_network, child->back, cur_branch);
+    child = child->next;
+  }
+  if (node->data)
+  {
+    memcpy(consensus_network->branch_data + *cur_branch, node->data, sizeof(pll_consensus_data_t));
+    consensus_data_destroy(node->data, 0);
+
+    node->back->data = node->data = consensus_network->branch_data + *cur_branch;
+    ++(*cur_branch);
+  }
+}
+
 static void fill_consensus(pll_consensus_utree_t * consensus_tree)
 {
   assert(consensus_tree);
@@ -1291,6 +1803,31 @@ static void fill_consensus(pll_consensus_utree_t * consensus_tree)
     assert(max_degree);
 
     fill_consensus_recurse(consensus_tree, child->back, &cur_branch);
+    child = child->next;
+  }
+}
+
+static void fill_consensus_network(pll_consensus_unetwork_t * consensus_network)
+{
+  assert(consensus_network);
+  assert(consensus_network->network);
+
+  pll_unetwork_node_t * root = consensus_network->network;
+  unsigned int cur_branch = 0;
+
+  free(root->data);
+  root->data = 0;
+
+  unsigned int max_degree = consensus_network->tip_count;
+  fill_consensus_recurse_network(consensus_network, root->back, &cur_branch);
+  pll_unetwork_node_t * child = root->next;
+  while(child != root)
+  {
+    /* prevent infinite loop */
+    --max_degree;
+    assert(max_degree);
+
+    fill_consensus_recurse_network(consensus_network, child->back, &cur_branch);
     child = child->next;
   }
 }

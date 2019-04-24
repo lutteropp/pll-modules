@@ -89,3 +89,75 @@ PLL_EXPORT int pllmod_unetwork_outgroup_root(pll_unetwork_t * network,
 {
   return PLL_FAILURE;
 }
+
+static int unetwork_traverse_apply(pll_unetwork_node_t * node,
+                                int (*cb_pre_trav)(pll_unetwork_node_t *, void *),
+                                int (*cb_in_trav)(pll_unetwork_node_t *, void *),
+                                int (*cb_post_trav)(pll_unetwork_node_t *, void *),
+                                void *data)
+{
+  int retval = 1;
+
+  if (!node->active)
+	return retval;
+
+  pll_unetwork_node_t * child_tree = 0;
+
+  if (cb_pre_trav && !cb_pre_trav(node,  data))
+    return PLL_FAILURE;
+
+  if (pllmod_unetwork_is_tip(node))
+  {
+    if (cb_in_trav)
+      retval &= cb_in_trav(node, data);
+    if (cb_post_trav)
+      retval &= cb_post_trav(node, data);
+    return retval;
+  }
+
+  child_tree = node->next;
+  while(child_tree != node)
+  {
+	if (child_tree->active) {
+      retval &= unetwork_traverse_apply(child_tree->back,
+                                     cb_pre_trav, cb_in_trav, cb_post_trav, data);
+
+      if (cb_in_trav &&
+          child_tree->next != node &&
+          !cb_in_trav(child_tree, data))
+        return PLL_FAILURE;
+	}
+
+    child_tree = child_tree->next;
+  }
+
+  if (cb_post_trav)
+    retval &= cb_post_trav(node,  data);
+
+  return retval;
+}
+
+PLL_EXPORT int pllmod_unetwork_traverse_apply(pll_unetwork_node_t * root,
+                                           int (*cb_pre_trav)(pll_unetwork_node_t *,
+                                                               void *),
+                                           int (*cb_in_trav)(pll_unetwork_node_t *,
+                                                               void *),
+                                           int (*cb_post_trav)(pll_unetwork_node_t *,
+                                                               void *),
+                                           void *data)
+{
+  int retval = 1;
+
+  assert(root);
+
+  if (pllmod_unetwork_is_tip(root)) return PLL_FAILURE;
+
+  retval &= unetwork_traverse_apply(root->back,
+                                 cb_pre_trav, cb_in_trav, cb_post_trav,
+                                 data);
+  retval &= unetwork_traverse_apply(root,
+                                 cb_pre_trav, cb_in_trav, cb_post_trav,
+                                 data);
+
+  return retval;
+}

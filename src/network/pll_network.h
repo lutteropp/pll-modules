@@ -333,6 +333,16 @@ PLL_EXPORT int pllmod_unetwork_outgroup_root(pll_unetwork_t * network,
                                           unsigned int outgroup_size,
                                           int add_root_node);
 
+/* Additional utilities in pll_unetwork.c */
+PLL_EXPORT int pllmod_unetwork_traverse_apply(pll_unetwork_node_t * root,
+                                        int (*cb_pre_trav)(pll_unetwork_node_t *,
+                                                           void *),
+                                        int (*cb_in_trav)(pll_unetwork_node_t *,
+                                                          void *),
+                                        int (*cb_post_trav)(pll_unetwork_node_t *,
+                                                            void *),
+                                        void *data);
+
 /* functions at unetwork_operations.c */
 PLL_EXPORT int pllmod_unetwork_connect_nodes(pll_unetwork_node_t * parent,
                                           pll_unetwork_node_t * child,

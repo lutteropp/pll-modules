@@ -28,11 +28,13 @@
   */
 
 #include "pll_tree.h"
+#include "../network/pll_network.h"
 #include "tree_hashtable.h"
 
 #include "../pllmod_common.h"
 
 static int cb_get_splits(pll_unode_t * node, void *data);
+static int cb_get_splits_network(pll_unetwork_node_t * node, void *data);
 static inline void merge_split(pll_split_t to,
                          const pll_split_t from,
                          unsigned int split_len);
@@ -43,6 +45,8 @@ static int compare_splits (pll_split_t s1,
                            unsigned int split_len);
 static unsigned int get_utree_splitmap_id(pll_unode_t * node,
                                           unsigned int tip_count);
+static unsigned int get_unetwork_splitmap_id(pll_unetwork_node_t * node,
+                                          unsigned int tip_count);
 static int split_is_valid_and_normalized(const pll_split_t bitv,
                                          unsigned int tip_count);
 
@@ -51,9 +55,24 @@ struct split_node_pair {
   pll_unode_t * node;
 };
 
+struct split_node_pair_network {
+  pll_split_t split;
+  pll_unetwork_node_t * node;
+};
+
 struct cb_split_params
 {
   struct split_node_pair * split_nodes;
+  unsigned int tip_count;
+  unsigned int split_size;
+  unsigned int split_len;
+  unsigned int split_count;  /* number of splits already set */
+  int *id_to_split;          /* map between node/subnode ids and splits */
+};
+
+struct cb_split_params_network
+{
+  struct split_node_pair_network * split_nodes;
   unsigned int tip_count;
   unsigned int split_size;
   unsigned int split_len;
@@ -534,6 +553,155 @@ PLL_EXPORT pll_split_t * pllmod_utree_split_create(const pll_unode_t * tree,
   return split_list;
 }
 
+/*
+ * Note: This function returns the splits according to the node indices at the tips!
+ *
+ * split_to_node_map can be NULL
+ */
+PLL_EXPORT pll_split_t * pllmod_network_split_create(const pll_unetwork_node_t * tree,
+                                                   unsigned int tip_count,
+                                                   pll_unetwork_node_t ** split_to_node_map)
+{
+  unsigned int i;
+  unsigned int split_count, split_len, split_size;
+  pll_split_t * split_list;   /* array with ordered split pointers */
+  pll_split_t splits;         /* contiguous array of splits, as size is known */
+  struct split_node_pair_network * split_nodes;
+  pll_split_t first_split;
+
+  /* as many non-trivial splits as inner tree branches */
+  split_count   = tip_count - 3;
+  split_size = (sizeof(pll_split_base_t) * 8);
+  split_len  = (tip_count / split_size) + (tip_count % (sizeof(pll_split_base_t) * 8) > 0);
+
+  split_list = (pll_split_t *) malloc(split_count * sizeof(pll_split_t));
+  if (!split_list)
+  {
+    pllmod_set_error(PLL_ERROR_MEM_ALLOC,
+                     "Cannot allocate memory for split list\n");
+    return NULL;
+  }
+
+  split_nodes = (struct split_node_pair_network *) malloc(split_count * sizeof(struct split_node_pair_network));
+  if (!split_nodes)
+  {
+    pllmod_set_error(PLL_ERROR_MEM_ALLOC,
+                     "Cannot allocate memory for split-node pairs\n");
+    free (split_list);
+    return NULL;
+  }
+
+  splits = (pll_split_t) calloc(split_count * split_len, sizeof(pll_split_base_t));
+  if (!splits)
+  {
+    pllmod_set_error(PLL_ERROR_MEM_ALLOC,
+                     "Cannot allocate memory for splits\n");
+    free (split_list);
+    free (split_nodes);
+    return NULL;
+  }
+
+  for (i=0; i<split_count; ++i)
+  {
+    split_nodes[i].split = splits + i*split_len;
+    split_list[i] = splits + i*split_len;
+  }
+
+  struct cb_split_params_network split_data;
+  split_data.split_nodes = split_nodes;
+  split_data.split_len   = split_len;
+  split_data.split_size  = split_size;
+  split_data.tip_count   = tip_count;
+  split_data.split_count = 0;
+
+  /* reserve positions for node and subnode ids */
+  split_data.id_to_split = (int *) malloc(sizeof(int) * 3 * (tip_count - 2));
+
+  if (!split_data.id_to_split)
+  {
+    pllmod_set_error(PLL_ERROR_MEM_ALLOC,
+                     "Cannot allocate memory for splits\n");
+    return NULL;
+  }
+
+  for (i=0; i<3*(tip_count-2);++i)
+    split_data.id_to_split[i] = -1;
+
+  if (node_is_leaf(tree))
+    tree = tree->back;
+
+  /* traverse for computing the scripts */
+  pllmod_unetwork_traverse_apply((pll_unetwork_node_t *) tree,
+                              NULL,
+                              NULL,
+                              &cb_get_splits_network,
+                              &split_data);
+
+  assert(split_data.split_count == split_count);
+
+  for (i=0; i<split_count; ++i)
+  {
+
+  }
+
+  free(split_data.id_to_split);
+
+  for (i=0; i<split_count; ++i)
+    bitv_normalize(split_list[i], tip_count);
+
+  /* sort map and split list together */
+  first_split = split_nodes[0].split;
+  qsort(split_nodes, split_count, sizeof(struct split_node_pair), _cmp_split_node_pair);
+
+  /* if first item has changed, swap them such that the array can be deallocated */
+  if (first_split != split_nodes[0].split)
+  {
+    /* find first split */
+    for (i=1; split_nodes[i].split != first_split && i < split_count; ++i);
+    assert(i < split_count);
+
+    /* swap */
+    void * aux_mem = malloc(sizeof(pll_split_base_t) * split_len);
+    if (!aux_mem)
+    {
+      pllmod_set_error(PLL_ERROR_MEM_ALLOC,
+                       "Cannot allocate memory for auxiliary array\n");
+      return NULL;
+    }
+
+    memcpy(aux_mem, first_split,  sizeof(pll_split_base_t) * split_len);
+    memcpy(first_split, split_nodes[0].split,     sizeof(pll_split_base_t) * split_len);
+    memcpy(split_nodes[0].split, aux_mem, sizeof(pll_split_base_t) * split_len);
+    free(aux_mem);
+    split_nodes[i].split = split_nodes[0].split;
+    split_nodes[0].split = first_split;
+  }
+
+  for (i=0; i<split_count; ++i)
+  {
+    split_list[i] = split_nodes[i].split;
+    assert(split_is_valid_and_normalized(split_list[i], tip_count));
+  }
+
+  /* update output arrays */
+  if (split_to_node_map)
+  {
+    for (i=0; i<split_count; ++i)
+    {
+      split_list[i] = split_nodes[i].split;
+      split_to_node_map[i] = split_nodes[i].node;
+    }
+  }
+  else
+  {
+    for (i=0; i<split_count; ++i)
+      split_list[i] = split_nodes[i].split;
+  }
+
+  free(split_nodes);
+
+  return split_list;
+}
 
 PLL_EXPORT
 bitv_hashtable_t * pllmod_utree_split_hashtable_create(unsigned int tip_count,
@@ -752,6 +920,87 @@ static int cb_get_splits(pll_unode_t * node, void *data)
   return 1;
 }
 
+/**
+ * Callback function for computing the splits at each branch
+ * The splits will be stored in data->splits
+ * at positions given by node index
+ */
+static int cb_get_splits_network(pll_unetwork_node_t * node, void *data)
+{
+  struct cb_split_params_network * split_data = (struct cb_split_params_network *) data;
+  pll_split_t current_split;
+
+  unsigned int tip_count     = split_data->tip_count;
+  unsigned int split_size    = split_data->split_size;
+  unsigned int split_len     = split_data->split_len;
+  unsigned int my_split_id, child_split_id;
+  unsigned int my_map_id, back_map_id;
+  unsigned int tip_id, split_id;
+
+  if (!(pllmod_unetwork_is_tip(node) || pllmod_unetwork_is_tip(node->back)))
+  {
+    my_map_id   = get_unetwork_splitmap_id(node, tip_count);
+    back_map_id = get_unetwork_splitmap_id(node->back, tip_count);
+    my_split_id = split_data->split_count;
+
+    /* check if the split for the branch was already set */
+    /* note that tree traversals visit the virtual root branch twice */
+    if (split_data->id_to_split[my_map_id] >= 0)
+    {
+      return 1;
+    }
+
+    assert(my_split_id < (tip_count - 3));
+    split_data->id_to_split[my_map_id] = (int) my_split_id;
+    split_data->id_to_split[back_map_id] = (int) my_split_id;
+
+    split_data->split_nodes[my_split_id].node = node;
+
+    /* get current split to fill */
+    current_split = split_data->split_nodes[my_split_id].split;
+    /* increase number of splits */
+    split_data->split_count++;
+
+    /* add the split from left branch */
+    if (!pllmod_unetwork_is_tip(node->next->back))
+    {
+      child_split_id = (unsigned int)
+        split_data->id_to_split[get_unetwork_splitmap_id(node->next, tip_count)];
+
+      memcpy(current_split, split_data->split_nodes[child_split_id].split,
+             sizeof(pll_split_base_t) * split_len);
+    }
+    else
+    {
+      tip_id     = node->next->back->node_index;
+      assert(tip_id < tip_count);
+      split_id   = tip_id / split_size;
+      tip_id    %= split_size;
+      current_split[split_id] = (1 << tip_id);
+    }
+
+    /* add the split from right branch */
+    if (!pllmod_unetwork_is_tip(node->next->next->back))
+    {
+      child_split_id = (unsigned int)
+        split_data->id_to_split[get_unetwork_splitmap_id(
+            node->next->next, tip_count)];
+      merge_split(current_split, split_data->split_nodes[child_split_id].split, split_len);
+    }
+    else
+    {
+      tip_id     = node->next->next->back->node_index;
+      assert(tip_id < tip_count);
+      split_id   = tip_id / split_size;
+      tip_id    %= split_size;
+      current_split[split_id] |= (1 << tip_id);
+    }
+  }
+
+  /* continue */
+  return 1;
+}
+
 /*
  * The order of the splits is not really significant, as long as the two
  * following agree.
@@ -805,7 +1054,17 @@ static unsigned int get_utree_splitmap_id(pll_unode_t * node,
   assert(node_id >= tip_count);
   return node_id - tip_count;
 }
-
+/*
+  The position of the node in the map of branches to splits is computed
+  according to the node id.
+ */
+static unsigned int get_unetwork_splitmap_id(pll_unetwork_node_t * node,
+                                          unsigned int tip_count)
+{
+  unsigned int node_id = node->node_index;
+  assert(node_id >= tip_count);
+  return node_id - tip_count;
+}
 
 /*
  * Returns 1 if the split is valid (not all 0s or all 1s) and normalized;

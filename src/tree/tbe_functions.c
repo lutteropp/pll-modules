@@ -589,4 +589,3 @@ PLL_EXPORT int pllmod_utree_tbe_naive(pll_split_t * ref_splits,
 
   return PLL_SUCCESS;
 }
-
