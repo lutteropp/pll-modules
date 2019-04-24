@@ -558,7 +558,7 @@ PLL_EXPORT pll_split_t * pllmod_utree_split_create(const pll_unode_t * tree,
  *
  * split_to_node_map can be NULL
  */
-PLL_EXPORT pll_split_t * pllmod_network_split_create(const pll_unetwork_node_t * tree,
+PLL_EXPORT pll_split_t * pllmod_unetwork_split_create(const pll_unetwork_node_t * tree,
                                                    unsigned int tip_count,
                                                    pll_unetwork_node_t ** split_to_node_map)
 {
