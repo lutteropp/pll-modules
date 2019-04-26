@@ -603,12 +603,32 @@ int unetwork_insert_tips_random(pll_unetwork_node_t ** nodes, unsigned int taxa_
     pll_unetwork_node_t * next_branch = branches[rand_branch_id];
 
     /* connect tip to selected branch */
-    pllmod_unetwork_connect_nodes(next_branch->back, next_inner,
-                               PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
-    pllmod_unetwork_connect_nodes(next_branch, next_inner->next,
-                               PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
-    pllmod_unetwork_connect_nodes(next_tip, next_inner->next->next,
-                               PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
+    if (next_branch->incoming)
+    {
+      pllmod_unetwork_connect_nodes(next_branch->back, next_inner,
+                                   PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
+      pllmod_unetwork_connect_nodes(next_inner->next, next_branch,
+                                   PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
+      pllmod_unetwork_connect_nodes(next_inner->next->next, next_tip,
+                                   PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
+
+      assert(next_inner->incoming == 1);
+      assert(next_inner->next->incoming == 0);
+      assert(next_inner->next->next->incoming == 0);
+    }
+    else
+    {
+      pllmod_unetwork_connect_nodes(next_inner, next_branch->back,
+    	                            PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
+      pllmod_unetwork_connect_nodes(next_branch, next_inner->next,
+    	                            PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
+      pllmod_unetwork_connect_nodes(next_inner->next->next, next_tip,
+    	                            PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
+
+      assert(next_inner->incoming == 0);
+      assert(next_inner->next->incoming == 1);
+      assert(next_inner->next->next->incoming == 0);
+    }
 
     if (pllmod_unetwork_is_tip (next_inner->back))
     {
@@ -808,11 +828,11 @@ PLL_EXPORT pll_unetwork_t * pllmod_unetwork_create_random(unsigned int taxa_coun
   network_root = nodes[taxa_count];
 
   /* build minimal network with 3 tips and 1 inner node */
-  pllmod_unetwork_connect_nodes(nodes[0], nodes[taxa_count],
+  pllmod_unetwork_connect_nodes(nodes[taxa_count], nodes[0],
                              PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
-  pllmod_unetwork_connect_nodes(nodes[1], nodes[taxa_count]->next,
+  pllmod_unetwork_connect_nodes(nodes[taxa_count]->next, nodes[1],
                              PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
-  pllmod_unetwork_connect_nodes(nodes[2], nodes[taxa_count]->next->next,
+  pllmod_unetwork_connect_nodes(nodes[taxa_count]->next->next, nodes[2],
                              PLLMOD_NETWORK_DEFAULT_BRANCH_LENGTH, 1.0);
 
   /* insert remaining taxa_count-3 tips into the network */
