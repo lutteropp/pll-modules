@@ -77,7 +77,6 @@ PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_unetwork_node_t 
 	}
 
 	/* save dimensions & options */
-	networkinfo->tip_count = tips;
 	networkinfo->partition_count = partitions;
 	networkinfo->brlen_linkage = brlen_linkage;
 
@@ -218,11 +217,11 @@ PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networki
 	networkinfo->alphas[partition_index] = alpha;
 
 	/* compute some derived dimensions */
-	unsigned int inner_nodes_count = networkinfo->tip_count - 2 + networkinfo->network->reticulation_count;
-	unsigned int nodes_count = inner_nodes_count + networkinfo->tip_count;
+	unsigned int inner_nodes_count = networkinfo->network->tip_count - 2 + networkinfo->network->reticulation_count;
+	unsigned int nodes_count = inner_nodes_count + networkinfo->network->tip_count;
 	unsigned int branch_count = nodes_count - 1;
 	unsigned int pmatrix_count = branch_count;
-	unsigned int unetwork_count = inner_nodes_count * 3 + networkinfo->tip_count;
+	unsigned int unetwork_count = inner_nodes_count * 3 + networkinfo->network->tip_count;
 
 	/* allocate invalidation arrays */
 	networkinfo->clv_valid[partition_index] = (char *) calloc(unetwork_count, sizeof(char));
@@ -693,7 +692,7 @@ PLL_EXPORT int pllmod_networkinfo_update_prob_matrices(pllmod_networkinfo_t * ne
 
 PLL_EXPORT void pllmod_networkinfo_invalidate_all(pllmod_networkinfo_t * networkinfo) {
 	unsigned int i, m;
-	unsigned int clv_count = networkinfo->tip_count + (networkinfo->tip_count - 2) * 3;
+	unsigned int clv_count = networkinfo->network->tip_count + (networkinfo->network->tip_count - 2 + networkinfo->network->reticulation_count) * 3;
 	unsigned int pmatrix_count = networkinfo->network->edge_count;
 
 	for (i = 0; i < networkinfo->init_partition_count; ++i) {
@@ -779,7 +778,7 @@ PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networ
 	/* update p-matrices if asked for */
 	if (update_pmatrices) {
 		if (collect_brlen) {
-			assert(traversal_size == networkinfo->tip_count * 2 - 2);
+			assert(traversal_size == networkinfo->network->tip_count * 2 - 2);
 			for (i = 0; i < traversal_size; ++i) {
 				pll_unetwork_node_t * node = networkinfo->travbuffer[i];
 				networkinfo->branch_lengths[0][node->pmatrix_index] = node->length;
@@ -943,11 +942,11 @@ static int networkinfo_check_network(pllmod_networkinfo_t * networkinfo,
     return PLL_FAILURE;
   }
 
-  if (networkinfo->tip_count != network->tip_count)
+  if (networkinfo->network->tip_count != network->tip_count)
   {
     pllmod_set_error(PLLMOD_NETWORK_ERROR_INVALID_NETWORK_SIZE,
                      "Invalid network size. Got %d instead of %d\n",
-					 network->tip_count, networkinfo->tip_count);
+					 network->tip_count, networkinfo->network->tip_count);
     return PLL_FAILURE;
   }
 
@@ -1060,9 +1059,9 @@ PLL_EXPORT int pllmod_networkinfo_set_constraint_network(pllmod_networkinfo_t * 
 	int * clv_index_map = (int *) calloc(node_count, sizeof(int));
 	int retval;
 
-	if (networkinfo->tip_count < cons_network->tip_count) {
+	if (networkinfo->network->tip_count < cons_network->tip_count) {
 		pllmod_set_error(PLLMOD_NETWORK_ERROR_INVALID_NETWORK_SIZE, "Invalid network size. Got %d instead of %d\n", cons_network->tip_count,
-				networkinfo->tip_count);
+				networkinfo->network->tip_count);
 		return PLL_FAILURE;
 	}
 
@@ -1082,10 +1081,10 @@ PLL_EXPORT int pllmod_networkinfo_set_constraint_network(pllmod_networkinfo_t * 
 
 	pll_unetwork_destroy(bin_cons_network, NULL);
 
-	if (networkinfo->tip_count > cons_network->tip_count) {
+	if (networkinfo->network->tip_count > cons_network->tip_count) {
 		// non-comprehensive constraint
-		unsigned int free_count = networkinfo->tip_count - cons_network->tip_count;
-		unsigned int ext_node_count = networkinfo->tip_count * 2 - 2;
+		unsigned int free_count = networkinfo->network->tip_count - cons_network->tip_count;
+		unsigned int ext_node_count = networkinfo->network->tip_count * 2 - 2;
 		int * ext_clv_index_map = (int *) calloc(ext_node_count, sizeof(int));
 
 		for (unsigned int i = 0; i < ext_node_count; ++i) {
@@ -1093,7 +1092,7 @@ PLL_EXPORT int pllmod_networkinfo_set_constraint_network(pllmod_networkinfo_t * 
 			if (clv_id < cons_network->tip_count) {
 				// copy map for tips in the constraint network and adjust clv_ids
 				ext_clv_index_map[clv_id] = clv_index_map[clv_id] + free_count;
-			} else if (clv_id < networkinfo->tip_count) {
+			} else if (clv_id < networkinfo->network->tip_count) {
 				// mark new tips as freely movable
 				ext_clv_index_map[clv_id] = -1;
 			} else if (clv_id < node_count + free_count) {

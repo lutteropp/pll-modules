@@ -1851,7 +1851,7 @@ PLL_EXPORT double pllmod_algo_spr_round_network(pllmod_networkinfo_t * networkin
 	best_lh = loglh;
 
 	/* query all nodes */
-	allnodes_count = (networkinfo->tip_count - 2) * 3;
+	allnodes_count = (networkinfo->network->tip_count - 2 + networkinfo->network->reticulation_count) * 3;
 	allnodes = (pll_unetwork_node_t **) calloc((size_t) allnodes_count, sizeof(pll_unetwork_node_t *));
 	if (!allnodes) {
 		pllmod_set_error(PLL_ERROR_MEM_ALLOC, "Cannot allocate memory nodes list\n");

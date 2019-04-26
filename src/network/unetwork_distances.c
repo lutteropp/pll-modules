@@ -212,7 +212,8 @@ PLL_EXPORT int pllmod_unetwork_consistency_set(pll_unetwork_t * t1,
 
 PLL_EXPORT unsigned int pllmod_unetwork_rf_distance(pll_unetwork_node_t * t1,
 		                                         pll_unetwork_node_t * t2,
-                                                 unsigned int tip_count)
+                                                 unsigned int tip_count,
+												 unsigned int reticulation_count)
 {
   unsigned int rf_distance;
 
@@ -220,8 +221,8 @@ PLL_EXPORT unsigned int pllmod_unetwork_rf_distance(pll_unetwork_node_t * t1,
   pll_errno = 0;
 
   /* split both networks */
-  pll_split_t * s1 = pllmod_unetwork_split_create(t1, tip_count, NULL);
-  pll_split_t * s2 = pllmod_unetwork_split_create(t2, tip_count, NULL);
+  pll_split_t * s1 = pllmod_unetwork_split_create(t1, tip_count, reticulation_count, NULL);
+  pll_split_t * s2 = pllmod_unetwork_split_create(t2, tip_count, reticulation_count, NULL);
 
   /* compute distance */
   rf_distance = pllmod_unetwork_split_rf_distance(s1, s2, tip_count);
@@ -408,6 +409,7 @@ PLL_EXPORT unsigned int pllmod_unetwork_split_hamming_distance(pll_split_t s1,
  */
 PLL_EXPORT pll_split_t * pllmod_unetwork_split_create(const pll_unetwork_node_t * network,
                                                    unsigned int tip_count,
+												   unsigned int reticulation_count,
                                                    pll_unetwork_node_t ** split_to_node_map)
 {
   unsigned int i;
@@ -463,7 +465,7 @@ PLL_EXPORT pll_split_t * pllmod_unetwork_split_create(const pll_unetwork_node_t 
   split_data.split_count = 0;
 
   /* reserve positions for node and subnode ids */
-  split_data.id_to_split = (int *) malloc(sizeof(int) * 3 * (tip_count - 2));
+  split_data.id_to_split = (int *) malloc(sizeof(int) * 3 * (tip_count - 2 + reticulation_count));
 
   if (!split_data.id_to_split)
   {

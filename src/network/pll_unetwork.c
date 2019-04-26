@@ -365,7 +365,7 @@ PLL_EXPORT pll_unetwork_t * pllmod_unetwork_resolve_multi(const pll_unetwork_t *
     old_inner_count = bin_network->inner_tree_count + bin_network->reticulation_count;
   }
 
-  assert(bin_network->inner_tree_count + bin_network->reticulation_count == bin_network->tip_count - 2);
+  assert(bin_network->inner_tree_count == bin_network->tip_count - 2 + bin_network->reticulation_count);
 
   bin_network->binary = 1;
 
@@ -493,7 +493,7 @@ PLL_EXPORT int pllmod_unetwork_outgroup_root(pll_unetwork_t * network,
       return PLL_FAILURE;
     }
 
-    network_splits = pllmod_unetwork_split_create(network->vroot, network->tip_count,
+    network_splits = pllmod_unetwork_split_create(network->vroot, network->tip_count, network->reticulation_count,
                                             split_to_node_map);
 
     if (!network_splits)
@@ -648,7 +648,7 @@ PLL_EXPORT int pllmod_unetwork_extend_random(pll_unetwork_t * network,
   unsigned int old_node_count  = old_taxa_count + old_inner_tree_count + old_reticulation_count;
   unsigned int new_taxa_count  = old_taxa_count + ext_taxa_count;
   unsigned int new_inner_tree_count = old_inner_tree_count + ext_taxa_count;
-  unsigned int new_reticulation_count = old_reticulation_count + ext_taxa_count;
+  unsigned int new_reticulation_count = old_reticulation_count;
   unsigned int new_node_count = new_taxa_count + new_inner_tree_count + new_reticulation_count;
 
   unsigned int last_clv_id     = 0;
@@ -1334,13 +1334,13 @@ static int cb_serialize(pll_unetwork_node_t * network,
 
 //TODO: serialize/expand using a compressed format instead of pll_unetwork_node_t
 PLL_EXPORT pll_unetwork_node_t * pllmod_unetwork_serialize(pll_unetwork_node_t * network,
-                                                unsigned int tip_count)
+                                                unsigned int tip_count, unsigned int reticulation_count)
 {
   unsigned int node_count;
   pll_unetwork_node_t * serialized_network;
   struct serial_network_s data;
 
-  node_count = 2*tip_count - 2;
+  node_count = 2*tip_count + reticulation_count - 2;
 
   /* allocate the serialized structure */
   serialized_network = (pll_unetwork_node_t *) malloc(node_count * sizeof (pll_unetwork_node_t));
@@ -1373,7 +1373,7 @@ PLL_EXPORT pll_unetwork_node_t * pllmod_unetwork_serialize(pll_unetwork_node_t *
 }
 
 PLL_EXPORT pll_unetwork_t * pllmod_unetwork_expand(pll_unetwork_node_t * serialized_network,
-                                             unsigned int tip_count)
+                                             unsigned int tip_count, unsigned int reticulation_count)
 {
   unsigned int i, node_count, next_node_index;
   pll_unetwork_node_t ** network_stack;
@@ -1382,7 +1382,7 @@ PLL_EXPORT pll_unetwork_t * pllmod_unetwork_expand(pll_unetwork_node_t * seriali
 
   pllmod_reset_error();
 
-  node_count  = 2*tip_count - 2;
+  node_count  = 2*tip_count + reticulation_count - 2;
 
   /* allocate stack for at most 'n_tips' nodes */
   network_stack = (pll_unetwork_node_t **) malloc(tip_count * sizeof (pll_unetwork_node_t *));

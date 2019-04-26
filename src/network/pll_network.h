@@ -152,7 +152,6 @@ typedef struct networkinfo_topology
 typedef struct networkinfo
 {
   // dimensions
-  unsigned int tip_count;
   unsigned int partition_count;
 
   /* 0 = linked/shared, 1 = linked with scaler, 2 = unlinked */
@@ -450,7 +449,8 @@ PLL_EXPORT int pllmod_rnetwork_outgroup_root(pll_rnetwork_t * network,
 
 PLL_EXPORT unsigned int pllmod_unetwork_rf_distance(pll_unetwork_node_t * t1,
                                                  pll_unetwork_node_t * t2,
-                                                 unsigned int tip_count);
+                                                 unsigned int tip_count,
+												 unsigned int reticulation_count);
 
 /* check that node ids and tip labels agree in both networks */
 PLL_EXPORT int pllmod_unetwork_consistency_check(pll_unetwork_t * t1,
@@ -468,6 +468,7 @@ PLL_EXPORT unsigned int pllmod_unetwork_split_rf_distance(pll_split_t * s1,
 
 PLL_EXPORT pll_split_t * pllmod_unetwork_split_create(const pll_unetwork_node_t * network,
                                                    unsigned int tip_count,
+												   unsigned int reticulation_count,
                                                    pll_unetwork_node_t ** split_to_node_map);
 
 PLL_EXPORT pll_split_t pllmod_unetwork_split_from_tips(unsigned int * subnetwork_tip_ids,
@@ -540,10 +541,10 @@ PLL_EXPORT int pllmod_unetwork_nni(pll_unetwork_node_t * edge,
 PLL_EXPORT int pllmod_network_rollback(pll_network_rollback_t * rollback_info);
 
 PLL_EXPORT pll_unetwork_node_t * pllmod_unetwork_serialize(pll_unetwork_node_t * network,
-                                                unsigned int tip_count);
+                                                unsigned int tip_count, unsigned int reticulation_count);
 
 PLL_EXPORT pll_unetwork_t * pllmod_unetwork_expand(pll_unetwork_node_t * serialized_network,
-                                             unsigned int tip_count);
+                                             unsigned int tip_count, unsigned int reticulation_count);
 
 PLL_EXPORT int pllmod_unetwork_draw_support(pll_unetwork_t * ref_network,
                                          const double * support,
