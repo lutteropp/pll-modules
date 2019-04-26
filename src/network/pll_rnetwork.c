@@ -152,7 +152,7 @@ PLL_EXPORT int pllmod_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64
 
 PLL_EXPORT pll_rnetwork_t * pllmod_rnetwork_create_random(unsigned int taxa_count,
                                                     const char * const* names,
-                                                    unsigned int random_seed) {
+                                                    unsigned int random_seed) { // TODO: I think this is the problem! Why is this function body empty???
 	return PLL_FAILURE;
 }
 

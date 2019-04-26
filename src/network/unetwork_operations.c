@@ -357,6 +357,8 @@ PLL_EXPORT int pllmod_unetwork_connect_nodes(pll_unetwork_node_t * parent,
   child->back = parent;
   pllmod_unetwork_set_length(parent, length);
   parent->prob = parent->back->prob = prob;
+  parent->incoming = 0;
+  child->incoming = 1;
 
   /* PMatrix index is set to parent node */
   child->pmatrix_index = parent->pmatrix_index;
