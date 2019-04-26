@@ -947,9 +947,11 @@ pll_unetwork_t * pllmod_unetwork_create_parsimony_multipart(unsigned int taxon_c
   if (network)
   {
     /* update pmatrix/scaler/node indices */
+	pll_unetwork_set_reticulation_parents(network, 0);
     pll_unetwork_reset_template_indices(network->nodes[network->tip_count +
                                                  network->inner_tree_count + network->reticulation_count - 1],
                                      network->tip_count);
+    pll_unetwork_forget_reticulation_parents(network);
 
     /* set default branch lengths */
     pllmod_unetwork_set_length_recursive(network,
