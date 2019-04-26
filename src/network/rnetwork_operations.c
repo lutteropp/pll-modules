@@ -352,44 +352,47 @@ PLL_EXPORT int pllmod_rnetwork_connect_nodes(pll_rnetwork_node_t * parent, pll_r
 		if (child->is_reticulation) {
 			if (!child->first_parent) {
 				child->first_parent = parent;
+				child->first_parent_prob = prob;
 			} else if (!child->second_parent) {
 				child->second_parent = parent;
+				child->second_parent_prob = prob;
 			} else {
 				return PLL_FAILURE;
 			}
 		} else {
 			child->parent = parent;
 		}
-		child->prob = prob;
 	} else {
 		if (!parent->left) {
 			parent->left = child;
 			if (child->is_reticulation) {
 				if (!child->first_parent) {
 					child->first_parent = parent;
+					child->first_parent_prob = prob;
 				} else if (!child->second_parent) {
 					child->second_parent = parent;
+					child->second_parent_prob = prob;
 				} else {
 					return PLL_FAILURE;
 				}
 			} else {
 				child->parent = parent;
 			}
-			child->prob = prob;
 		} else if (!parent->right) {
 			parent->right = child;
 			if (child->is_reticulation) {
 				if (!child->first_parent) {
 					child->first_parent = parent;
+					child->first_parent_prob = prob;
 				} else if (!child->second_parent) {
 					child->second_parent = parent;
+					child->second_parent_prob = prob;
 				} else {
 					return PLL_FAILURE;
 				}
 			} else {
 				child->parent = parent;
 			}
-			child->prob = prob;
 		} else {
 			return PLL_FAILURE;
 		}
