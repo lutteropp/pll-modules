@@ -749,7 +749,7 @@ PLL_EXPORT void pllmod_networkinfo_invalidate_clv(pllmod_networkinfo_t * network
 	}
 }
 
-PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) { // TODO: This still needs to be adapted to networks!!!
+static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) { // TODO: This still needs to be adapted to networks!!!
 	/* network root must be an inner node! */
 	assert(!pllmod_unetwork_is_tip(networkinfo->root));
 
@@ -849,6 +849,14 @@ PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networ
 	assert(total_loglh < 0.);
 
 	return total_loglh;
+}
+
+PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) { // TODO: This still needs to be adapted to networks!!!
+	if (networkinfo->network->reticulation_count == 0) {
+		return pllmod_networkinfo_compute_loglh_tree(networkinfo, incremental, update_pmatrices);
+	} else {
+		return PLL_FAILURE; // this still needs to be implemented!
+	}
 }
 
 PLL_EXPORT double pllmod_networkinfo_compute_loglh_flex(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) {
