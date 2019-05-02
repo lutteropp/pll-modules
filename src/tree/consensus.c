@@ -53,8 +53,6 @@ static void recursive_assign_indices_network(pll_unetwork_node_t * node,
                                      unsigned int * inner_node_index);
 static void reset_template_indices(pll_unode_t * node,
                                    unsigned int tip_count);
-static void reset_template_indices_network(pll_unetwork_node_t * node,
-                                   unsigned int tip_count);
 static void build_tips_recurse(pll_unode_t * tree,
                                char * const *tip_labels,
                                unsigned int split_len);
@@ -433,7 +431,7 @@ PLL_EXPORT pll_consensus_unetwork_t * pllmod_unetwork_from_splits(
   if (network->back)
     build_tips_recurse_network(network->back, tip_labels, split_len);
 
-  reset_template_indices_network(network, tip_count);
+  pll_unetwork_wrapnetwork(network, tip_count); // this also sets the indices
 
   if (return_network)
     fill_consensus_network(return_network);
@@ -1644,54 +1642,6 @@ static void reset_template_indices(pll_unode_t * node,
   }
 }
 
-static void reset_template_indices_network(pll_unetwork_node_t * node,
-                                   unsigned int tip_count)
-{
-  unsigned int inner_clv_index = tip_count;
-  unsigned int inner_node_index = tip_count;
-  int inner_scaler_index = 0;
-
-  if (node_is_leaf(node))
-  {
-    node = node->back;
-    assert(!node_is_leaf(node));
-  }
-
-  if (node->back)
-    recursive_assign_indices_network(node->back,
-                             &inner_clv_index,
-                             &inner_scaler_index,
-                             &inner_node_index);
-
-  pll_unetwork_node_t * sibling = node->next;
-  while(sibling != node)
-  {
-    recursive_assign_indices_network(sibling->back,
-                             &inner_clv_index,
-                             &inner_scaler_index,
-                             &inner_node_index);
-    sibling = sibling->next;
-  }
-
-  node->node_index   = inner_node_index++;
-  node->clv_index    = inner_clv_index;
-  node->scaler_index = inner_scaler_index;
-
-  sibling = node->next;
-  while(sibling != node)
-  {
-    sibling->node_index = inner_node_index;
-    sibling->clv_index = inner_clv_index;
-    sibling->scaler_index = inner_scaler_index;
-    inner_node_index++;
-
-    if (sibling->back)
-      sibling->pmatrix_index = sibling->back->pmatrix_index;
-
-    sibling = sibling->next;
-  }
-}
-
 static void consensus_data_destroy(void * data, int destroy_split)
 {
   pll_consensus_data_t * cdata = (pll_consensus_data_t *) data;
@@ -1752,7 +1702,7 @@ static void fill_consensus_recurse_network(pll_consensus_unetwork_t * consensus_
   pll_unetwork_node_t * child;
   unsigned int max_degree = consensus_network->tip_count;
 
-  if (node_is_leaf(node))
+  if (pll_unetwork_is_leaf(node))
   {
     /* free tip data pointer */
     consensus_data_destroy(node->data, 1);
