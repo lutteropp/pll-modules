@@ -281,7 +281,7 @@ PLL_EXPORT int pllmod_rnetwork_traverse_apply(pll_rnode_t * root,
 
 /* networkinfo */
 
-PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_unetwork_node_t * root,
+PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_unetwork_t * network,
                                                      unsigned int tips,
                                                      unsigned int partitions,
                                                      int brlen_linkage);

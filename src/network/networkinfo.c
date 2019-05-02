@@ -66,7 +66,7 @@ static int networkinfo_partition_active(pllmod_networkinfo_t * networkinfo,
 		  networkinfo->active_partition == (int) partition_index);
 }
 
-PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_unetwork_node_t * root, unsigned int tips, unsigned int partitions,
+PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_unetwork_t * network, unsigned int tips, unsigned int partitions,
 		int brlen_linkage) {
 	/* create networkinfo instance */
 	pllmod_networkinfo_t * networkinfo;
@@ -80,8 +80,8 @@ PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_unetwork_node_t 
 	networkinfo->partition_count = partitions;
 	networkinfo->brlen_linkage = brlen_linkage;
 
-	/* create pll_unetwork structure and store it in networkinfo */
-	networkinfo->network = pll_unetwork_wrapnetwork(root, tips);
+	/* store it in networkinfo */
+	networkinfo->network = network;
 
 	if (!networkinfo->network || !networkinfo_check_network(networkinfo, networkinfo->network)) {
 		assert(pll_errno);
@@ -749,7 +749,7 @@ PLL_EXPORT void pllmod_networkinfo_invalidate_clv(pllmod_networkinfo_t * network
 	}
 }
 
-PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) {
+PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) { // TODO: This still needs to be adapted to networks!!!
 	/* network root must be an inner node! */
 	assert(!pllmod_unetwork_is_tip(networkinfo->root));
 

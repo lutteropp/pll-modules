@@ -342,7 +342,7 @@ PLL_EXPORT pll_consensus_unetwork_t * pllmod_unetwork_from_splits(
       assert(next_n);
     }
 
-    return_network->network = network;
+    return_network->network = pll_unetwork_wrapnetwork(network, tip_count);
   }
   else
   {
@@ -382,7 +382,7 @@ PLL_EXPORT pll_consensus_unetwork_t * pllmod_unetwork_from_splits(
     network->back = create_consensus_node_network(NULL, rootsplit2, support_values[0], split_len);
     network->back->back = network;
 
-    return_network->network = network;
+    return_network->network = pll_unetwork_wrapnetwork(network, tip_count);;
 
     /* add splits individually */
     for (i=1; i<(split_system->split_count+tip_count); ++i)
@@ -431,7 +431,7 @@ PLL_EXPORT pll_consensus_unetwork_t * pllmod_unetwork_from_splits(
   if (network->back)
     build_tips_recurse_network(network->back, tip_labels, split_len);
 
-  pll_unetwork_wrapnetwork(network, tip_count); // this also sets the indices
+  return_network->network = pll_unetwork_wrapnetwork(network, tip_count); // this also sets the indices
 
   if (return_network)
     fill_consensus_network(return_network);
@@ -892,8 +892,8 @@ PLL_EXPORT void pllmod_unetwork_consensus_destroy(pll_consensus_unetwork_t * net
   free(network->branch_data);
 
   /* dealloc network structure */
-  dealloc_graph_recursive_network(network->network->back);
-  dealloc_graph_recursive_network(network->network);
+  dealloc_graph_recursive_network(network->network->vroot->back);
+  dealloc_graph_recursive_network(network->network->vroot);
 
   /* dealloc network */
   free(network);
@@ -1762,7 +1762,7 @@ static void fill_consensus_network(pll_consensus_unetwork_t * consensus_network)
   assert(consensus_network);
   assert(consensus_network->network);
 
-  pll_unetwork_node_t * root = consensus_network->network;
+  pll_unetwork_node_t * root = consensus_network->network->vroot;
   unsigned int cur_branch = 0;
 
   free(root->data);

@@ -119,7 +119,7 @@ typedef struct consensus_utree_t
 
 typedef struct consensus_unetwork_t
 {
-  pll_unetwork_node_t * network;
+  pll_unetwork_t * network;
   pll_consensus_data_t * branch_data;
   unsigned int tip_count;
   unsigned int branch_count;
