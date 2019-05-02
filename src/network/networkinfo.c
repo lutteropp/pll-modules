@@ -771,7 +771,7 @@ static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * netwo
 	if (!incremental || (update_pmatrices && collect_brlen)) {
 		/* perform a FULL postorder traversal of the unrooted network */
 		if (!pll_unetwork_tree_traverse(networkinfo->network,
-		PLL_TREE_TRAVERSE_POSTORDER, cb_full_traversal_network, networkinfo->travbuffer, &traversal_size, 0))
+		PLL_NETWORK_TRAVERSE_POSTORDER, cb_full_traversal_network, networkinfo->travbuffer, &traversal_size, 0))
 			return LOGLH_NONE;
 	}
 
