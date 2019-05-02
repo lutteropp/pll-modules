@@ -1944,7 +1944,7 @@ double pllmod_algo_opt_frequencies_networkinfo (pllmod_networkinfo_t * networkin
                                               max_free_params,
                                               factor, tolerance,
                                               (void *) &opt_params,
-                                              target_freqs_func_multi);
+                                              target_freqs_func_multi_network);
 
   /* cleanup */
   for (i = 0; i < part_count; ++i)

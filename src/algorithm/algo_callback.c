@@ -986,3 +986,101 @@ double target_freqs_func_multi(void * p, double ** x, double * fx,
 
   return score;
 }
+
+double target_freqs_func_multi_network(void * p, double ** x, double * fx,
+                               int * converged)
+{
+  struct networkinfo_opt_params * params = (struct networkinfo_opt_params *) p;
+
+  pllmod_networkinfo_t * networkinfo = params->networkinfo;
+  unsigned int num_parts             = params->num_opt_partitions;
+  unsigned int params_index          = params->params_index;
+  unsigned int * highest_freq_state  = params->fixed_var_index;
+
+  double score = -INFINITY;
+
+  /* any partitions which have not converged yet? */
+  double unconverged_flag = 0.;
+
+  size_t i, j;
+  size_t part = 0;
+  for (i = 0; i < networkinfo->partition_count; ++i)
+  {
+    pll_partition_t * partition = networkinfo->partitions[i];
+
+    if (networkinfo->params_to_optimize[i] & PLLMOD_OPT_PARAM_FREQUENCIES)
+    {
+      if (!partition || (converged && converged[part]))
+      {
+        /* partitions has converged, skip it */
+        part++;
+        continue;
+      }
+
+      unconverged_flag = 1.;
+
+      /* function was called solely to check convergence -> no LH computation */
+      if (!x)
+      {
+        part++;
+        continue;
+      }
+
+      unsigned int states             = partition->states;
+      double * freqs                  = partition->frequencies[params_index];
+
+      double sum_ratios = 1.0;
+      unsigned int cur_index;
+
+      /* update frequencies */
+      for (j = 0; j < (states - 1); ++j)
+      {
+        assert(x[part][j] == x[part][j]);
+        sum_ratios += x[part][j];
+      }
+      cur_index = 0;
+      for (j = 0; j < states; ++j)
+      {
+        if (j != highest_freq_state[part])
+        {
+          freqs[j] = x[part][cur_index] / sum_ratios;
+          cur_index++;
+        }
+      }
+      freqs[highest_freq_state[part]] = 1.0 / sum_ratios;
+
+//      printf("freqs: %f %f %f %f ", freqs[0], freqs[1], freqs[2], freqs[3]);
+
+      /* important!! invalidate eigen-decomposition */
+      partition->eigen_decomp_valid[params_index] = 0;
+
+      part++;
+    }
+  }
+
+  /* compute negative score */
+  if (x)
+    score = -1 * pllmod_networkinfo_compute_loglh(networkinfo, 0, 1);
+
+  /* copy per-partition likelihood to the output array */
+  if (fx)
+  {
+    j = 0;
+    for (i = 0; i < networkinfo->partition_count; ++i)
+      if (networkinfo->params_to_optimize[i] & PLLMOD_OPT_PARAM_FREQUENCIES)
+        fx[j++] = -1 * networkinfo->partition_loglh[i];
+  }
+
+  if (converged)
+  {
+    /* check if there is at least one unconverged partition in *any* thread */
+    if (networkinfo->parallel_reduce_cb)
+    {
+    	networkinfo->parallel_reduce_cb(networkinfo->parallel_context,
+                                   &unconverged_flag, 1, PLLMOD_COMMON_REDUCE_SUM);
+    }
+    converged[num_parts] = unconverged_flag > 0. ? 0 : 1;
+  }
+
+  return score;
+}
