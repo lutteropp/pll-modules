@@ -122,6 +122,9 @@ double target_func_multidim_networkinfo(void * p, double ** x, double * fx,
 double target_subst_params_func_multi(void * p, double ** x, double * fx,
                                       int * converged);
 
+double target_subst_params_func_multi_network(void * p, double ** x, double * fx,
+                                      int * converged);
+
 double target_freqs_func_multi(void * p, double ** x, double * fx,
                                int * converged);
 

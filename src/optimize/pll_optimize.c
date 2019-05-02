@@ -1306,6 +1306,70 @@ static void utree_derivative_func_multi (void * parameters, double * proposal,
   }
 }
 
+static void unetwork_derivative_func_multi (void * parameters, double * proposal,
+                                         double *df, double *ddf)
+{
+  pll_newton_network_params_multi_t * params =
+                                (pll_newton_network_params_multi_t *) parameters;
+  size_t p;
+  int unlinked = (params->brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED) ? 1 : 0;
+
+  if (unlinked)
+  {
+    for (p = 0; p < params->partition_count; ++p)
+      df[p] = ddf[p] = 0;
+  }
+  else
+    *df = *ddf = 0;
+
+  /* simply iterate over partitions and add up the derivatives */
+  for (p = 0; p < params->partition_count; ++p)
+  {
+    /* skip remote partitions */
+    if (!params->partitions[p])
+      continue;
+
+    double p_df, p_ddf;
+    double s = params->brlen_scalers ? params->brlen_scalers[p] : 1.;
+    double p_brlen =  s * (unlinked ? proposal[p] : proposal[0]);
+    pll_compute_likelihood_derivatives (params->partitions[p],
+                                        params->network->scaler_index,
+                                        params->network->back->scaler_index,
+                                        p_brlen,
+                                        params->params_indices[p],
+                                        params->precomp_buffers[p],
+                                        &p_df, &p_ddf);
+
+    /* chain rule! */
+    if (unlinked)
+    {
+      df[p] = s * p_df;
+      ddf[p] = s * s * p_ddf;
+    }
+    else
+    {
+      df[0] += s * p_df;
+      ddf[0] += s * s * p_ddf;
+    }
+  }
+
+  if (params->parallel_reduce_cb)
+  {
+    if (unlinked)
+    {
+      params->parallel_reduce_cb(params->parallel_context, df, p, PLLMOD_COMMON_REDUCE_SUM);
+      params->parallel_reduce_cb(params->parallel_context, ddf, p, PLLMOD_COMMON_REDUCE_SUM);
+    }
+    else
+    {
+      double d[2] = {*df, *ddf};
+      params->parallel_reduce_cb(params->parallel_context, d, 2, PLLMOD_COMMON_REDUCE_SUM);
+      *df = d[0];
+      *ddf = d[1];
+    }
+  }
+}
+
 static void utree_derivative_func_multi_old (void * parameters, double proposal,
                                          double *df, double *ddf)
 {
@@ -1920,7 +1984,7 @@ static int recomp_iterative_multi_network(pll_newton_network_params_multi_t * pa
                                                 params->max_newton_iters,
                                                 params->converged,
                                                 params,
-                                                utree_derivative_func_multi);
+                                                unetwork_derivative_func_multi);
     }
     break;
     case PLLMOD_OPT_BLO_NEWTON_FALLBACK:
