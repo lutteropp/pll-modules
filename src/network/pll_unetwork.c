@@ -1790,3 +1790,148 @@ static char * default_support_fmt(double support)
 
   return size_alloced >= 0 ? sup_str : NULL;
 }
+
+pll_unetwork_node_t * go_down_recursive(pll_unetwork_node_t * node, int * present)
+{
+  if (!node)
+  {
+	return NULL;
+  }
+  if (pll_unetwork_is_reticulation(node))
+  {
+	return go_down_recursive(pll_unetwork_get_reticulation_child(node), present);
+  }
+  if (present[node->clv_index])
+  {
+  	return node;
+  }
+
+  pll_unetwork_node_t * child1 = NULL;
+  pll_unetwork_node_t * child2 = NULL;
+  pll_unetwork_get_tree_children(node, &child1, &child2);
+
+  // check left child and right child first
+  if (present[child1->clv_index])
+  {
+	return child1;
+  }
+  if (present[child2->clv_index])
+  {
+	return child2;
+  }
+
+  if (child1->active) {
+	  pll_unetwork_node_t * try1 = go_down_recursive(child1, present);
+	  if (try1) {
+		  return try1;
+	  }
+  }
+
+  if (child2->active) {
+  	  pll_unetwork_node_t * try2 = go_down_recursive(child2, present);
+  	  if (try2) {
+  		  return try2;
+  	  }
+  }
+
+  return NULL; // we should never end up here though
+}
+
+double collect_branch_length_to_first_present_parent(pll_unetwork_node_t * node, int * present, uint64_t tree_number)
+{
+  if (pll_unetwork_is_reticulation(node))
+  {
+	return PLL_FAILURE; // this should not happen as reticulation nodes should not be in this post-order tree traversal.
+  }
+  double branch_sum = node->length;
+  pll_unetwork_node_t * parent = pll_unetwork_get_active_parent(node);
+  while (!present[parent->clv_index])
+  {
+	node = parent;
+	branch_sum += node->length;
+	parent = pll_unetwork_get_active_parent(node);
+  }
+  return branch_sum;
+}
+
+int cb_full_unetwork_traversal(pll_unetwork_node_t * node) {
+	(void) node;
+	return 1;
+}
+
+PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result) {
+	unsigned int nodes_count = network->reticulation_count + network->inner_tree_count + network->tip_count;
+	unsigned int inner_nodes_count = network->reticulation_count + network->inner_tree_count;
+	unsigned int branch_count = network->inner_tree_count * 2 + network->reticulation_count;
+
+	pll_unetwork_node_t ** trav_buffer = (pll_unetwork_node_t **) malloc(nodes_count * sizeof(pll_unetwork_node_t *));
+	unsigned int trav_size;
+	if (!pll_unetwork_tree_traverse(network, PLL_TREE_TRAVERSE_POSTORDER, cb_full_unetwork_traversal, trav_buffer, &trav_size, tree_number)) {
+		return PLL_FAILURE;
+	}
+
+	int * present = (int *) calloc(nodes_count, sizeof(int));
+	unsigned int i;
+	for (i = 0; i < trav_size; ++i)
+	{
+	  if (pll_unetwork_is_leaf(trav_buffer[i]) || pll_unetwork_count_active_outgoing(trav_buffer[i]) >= 2) {
+		  present[trav_buffer[i]->clv_index] = 1;
+	  } else {
+		  present[trav_buffer[i]->clv_index] = 0;
+	  }
+	}
+
+    result->branch_lengths = (double *) malloc(branch_count * sizeof(double));
+    result->operations = (pll_operation_t *) malloc(inner_nodes_count * sizeof(pll_operation_t));
+    result->ops_count = 0;
+    result->pmatrix_indices = (unsigned int *) malloc(branch_count * sizeof(unsigned int));
+    result->matrix_count = 0;
+
+    // TODO: Fill the operations array, note that we have to sum up the branch lengths that lie on a path...
+    // (by going up through the parents, this gets a bit tricky when encountering reticulations because then we also have to figure out whether the edge belongs to the current tree)
+    for (i = 0; i < trav_size; ++i)
+    {
+      pll_unetwork_node_t * node = trav_buffer[i];
+
+      if (pll_unetwork_is_reticulation(node))
+      {
+        free(present);
+        return PLL_FAILURE; // because the reticulations should have been thrown out in the post-order tree-traversal already...
+      }
+
+      /* do not store the branch of the root, since it does not exist */
+      if (i < trav_size-1)
+      {
+        *(result->branch_lengths)++ = collect_branch_length_to_first_present_parent(node, present, tree_number);
+        *(result->pmatrix_indices)++ = node->pmatrix_index;
+        result->matrix_count = result->matrix_count + 1;
+      }
+
+      if (pll_unetwork_is_inner_tree(node)) // inner tree node
+      {
+        result->operations[result->ops_count].parent_clv_index = node->clv_index;
+        result->operations[result->ops_count].parent_scaler_index = node->scaler_index;
+
+        // These values change! It could be that the child is not in the trav_buffer, in this case go down until a child has been found!
+        // Keep in mind that only nodes with at most one non-dead child are thrown out from the trav_buffer, and dead nodes are thrown out, too
+
+        pll_unetwork_node_t * child1 = NULL;
+        pll_unetwork_node_t * child2 = NULL;
+        pll_unetwork_get_tree_children(node, &child1, &child2);
+        pll_unetwork_node_t * left = go_down_recursive(child1, present);
+        pll_unetwork_node_t * right = go_down_recursive(child2, present);
+
+        result->operations[result->ops_count].child1_clv_index = left->clv_index;
+        result->operations[result->ops_count].child1_scaler_index = left->scaler_index;
+        result->operations[result->ops_count].child1_matrix_index = left->pmatrix_index;
+
+        result->operations[result->ops_count].child2_clv_index = right->clv_index;
+        result->operations[result->ops_count].child2_scaler_index = right->scaler_index;
+        result->operations[result->ops_count].child2_matrix_index = right->pmatrix_index;
+
+        result->ops_count = result->ops_count + 1;
+      }
+    }
+    free(present);
+	return PLL_SUCCESS;
+}

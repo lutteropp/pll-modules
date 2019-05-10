@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 2.8.10 FATAL_ERROR)
 #set(PLLMOD_CFLAGS  "-Wall -Wsign-compare -D_GNU_SOURCE -std=c99 -O3")
 if(PLLMOD_DEBUG)
 #	set(PLLMOD_CFLAGS "${PLLMOD_CFLAGS} -DDEBUG")
-    set(PLLMOD_CFLAGS "-Wall -Wsign-compare -D_GNU_SOURCE -std=c99 -DDEBUG")
+    set(PLLMOD_CFLAGS "-Wall -Wsign-compare -D_GNU_SOURCE -std=c99 -DDEBUG -g -O0")
 endif()
 
 set(CMAKE_SHARED_LINKER_FLAGS  "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-undefined -Wl,dynamic_lookup")

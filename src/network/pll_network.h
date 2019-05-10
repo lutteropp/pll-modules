@@ -75,6 +75,7 @@ typedef struct pll_displayed_tree_s
 } pll_displayed_tree_t;
 
 PLL_EXPORT int pllmod_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result);
+PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result);
 
 typedef struct pll_network_edge
 {

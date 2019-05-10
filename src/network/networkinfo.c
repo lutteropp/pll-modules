@@ -867,11 +867,21 @@ static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * netwo
 	return total_loglh;
 }
 
+double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices, unsigned int tree_number) {
+	pll_displayed_tree_t * arrays = (pll_displayed_tree_t*) malloc(sizeof(pll_displayed_tree_t));
+	pllmod_unetwork_tree_buildarrays(networkinfo->network, tree_number, arrays);
+
+	// TODO: We still need to continue from here...
+
+	return PLL_FAILURE;
+}
+
 PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) { // TODO: This still needs to be adapted to networks!!!
 	if (networkinfo->network->reticulation_count == 0) {
 		return pllmod_networkinfo_compute_loglh_tree(networkinfo, incremental, update_pmatrices);
 	} else {
-		return PLL_FAILURE; // this still needs to be implemented!
+		printf("pllmod_networkinfo_compute_loglh called but it hasn't been integrated yet. Returning a failure.\n");
+		return PLL_FAILURE; // TODO: this still needs to be implemented!
 	}
 }
 
