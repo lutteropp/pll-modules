@@ -22,48 +22,40 @@
 #include "../pllmod_common.h"
 #include "pll_network.h"
 
-static int networkinfo_check_network(pllmod_networkinfo_t * networkinfo,
-                               pll_unetwork_t * network);
+static int networkinfo_check_network(pllmod_networkinfo_t * networkinfo, pll_unetwork_t * network);
 static int networkinfo_init_network(pllmod_networkinfo_t * networkinfo);
 
 /* a callback function for performing a full traversal */
-static int cb_full_traversal_network(pll_unetwork_node_t * node)
-{
-  PLLMOD_UNUSED(node);
-  return PLL_SUCCESS;
+static int cb_full_traversal_network(pll_unetwork_node_t * node) {
+	PLLMOD_UNUSED(node);
+	return PLL_SUCCESS;
 }
 
 /* a callback function for performing a partial traversal on invalid CLVs */
-static int cb_partial_traversal_network(pll_unetwork_node_t * node)
-{
-  /* do not include tips */
-  if (!node->next) return PLL_FAILURE;
+static int cb_partial_traversal_network(pll_unetwork_node_t * node) {
+	/* do not include tips */
+	if (!node->next)
+		return PLL_FAILURE;
 
-  pllmod_networkinfo_t * networkinfo = (pllmod_networkinfo_t *) node->data;
+	pllmod_networkinfo_t * networkinfo = (pllmod_networkinfo_t *) node->data;
 
-  /* if clv is invalid, traverse the subnetwork to compute it */
-  if (networkinfo->active_partition == PLLMOD_NETWORKINFO_PARTITION_ALL)
-  {
-    /* check if at least one per-partition CLV is invalid */
-    for (unsigned int i = 0; i < networkinfo->init_partition_count; ++i)
-    {
-      unsigned int p = networkinfo->init_partition_idx[i];
-      if (networkinfo->clv_valid[p][node->node_index] == 0)
-        return PLL_SUCCESS;
-    }
+	/* if clv is invalid, traverse the subnetwork to compute it */
+	if (networkinfo->active_partition == PLLMOD_NETWORKINFO_PARTITION_ALL) {
+		/* check if at least one per-partition CLV is invalid */
+		for (unsigned int i = 0; i < networkinfo->init_partition_count; ++i) {
+			unsigned int p = networkinfo->init_partition_idx[i];
+			if (networkinfo->clv_valid[p][node->node_index] == 0)
+				return PLL_SUCCESS;
+		}
 
-    /* CLVs for all partitions are valid -> skip subnetwork */
-    return PLL_FAILURE;
-  }
-  else
-    return (networkinfo->clv_valid[networkinfo->active_partition][node->node_index] == 0);
+		/* CLVs for all partitions are valid -> skip subnetwork */
+		return PLL_FAILURE;
+	} else
+		return (networkinfo->clv_valid[networkinfo->active_partition][node->node_index] == 0);
 }
 
-static int networkinfo_partition_active(pllmod_networkinfo_t * networkinfo,
-                                     unsigned int partition_index)
-{
-  return (networkinfo->active_partition == PLLMOD_NETWORKINFO_PARTITION_ALL ||
-		  networkinfo->active_partition == (int) partition_index);
+static int networkinfo_partition_active(pllmod_networkinfo_t * networkinfo, unsigned int partition_index) {
+	return (networkinfo->active_partition == PLLMOD_NETWORKINFO_PARTITION_ALL || networkinfo->active_partition == (int) partition_index);
 }
 
 PLL_EXPORT pllmod_networkinfo_t * pllmod_networkinfo_create(pll_unetwork_t * network, unsigned int tips, unsigned int partitions,
@@ -692,7 +684,8 @@ PLL_EXPORT int pllmod_networkinfo_update_prob_matrices(pllmod_networkinfo_t * ne
 
 PLL_EXPORT void pllmod_networkinfo_invalidate_all(pllmod_networkinfo_t * networkinfo) {
 	unsigned int i, m;
-	unsigned int clv_count = networkinfo->network->tip_count + (networkinfo->network->tip_count - 2 + networkinfo->network->reticulation_count) * 3;
+	unsigned int clv_count = networkinfo->network->tip_count
+			+ (networkinfo->network->tip_count - 2 + networkinfo->network->reticulation_count) * 3;
 	unsigned int pmatrix_count = networkinfo->network->edge_count;
 
 	for (i = 0; i < networkinfo->init_partition_count; ++i) {
@@ -800,23 +793,6 @@ static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * netwo
 	NULL,
 	NULL, networkinfo->operations,
 	NULL, &ops_count);
-
-	/*
-	// DEBUG: Print operations array
-	for (i = 0; i < ops_count; ++i)
-	{
-	  printf("operations[%d]:\n", i);
-	  printf("  parent_clv_index: %d\n", networkinfo->operations[i].parent_clv_index);
-	  printf("  parent_scaler_index: %d\n", networkinfo->operations[i].parent_scaler_index);
-	  printf("  child1_clv_index: %d\n", networkinfo->operations[i].child1_clv_index);
-	  printf("  child1_matrix_index: %d\n", networkinfo->operations[i].child1_matrix_index);
-	  printf("  child1_scaler_index: %d\n", networkinfo->operations[i].child1_scaler_index);
-	  printf("  child2_clv_index: %d\n", networkinfo->operations[i].child2_clv_index);
-	  printf("  child2_matrix_index: %d\n", networkinfo->operations[i].child2_matrix_index);
-	  printf("  child2_scaler_index: %d\n", networkinfo->operations[i].child2_scaler_index);
-	}
-	*/
-
 	networkinfo->counter += ops_count;
 
 	//  printf("Traversal size (%s): %u\n", incremental ? "part" : "full", ops_count);
@@ -867,21 +843,78 @@ static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * netwo
 	return total_loglh;
 }
 
-double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices, unsigned int tree_number) {
+double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices,
+		unsigned int tree_number) {
 	pll_displayed_tree_t * arrays = (pll_displayed_tree_t*) malloc(sizeof(pll_displayed_tree_t));
 	pllmod_unetwork_tree_buildarrays(networkinfo->network, tree_number, arrays);
 
-	// TODO: We still need to continue from here...
+	/* network root must be an inner node! */
+	assert(!pllmod_unetwork_is_tip(networkinfo->root));
 
-	return PLL_FAILURE;
+	const double LOGLH_NONE = (double) NAN;
+	double total_loglh = 0.0;
+	const int old_active_partition = networkinfo->active_partition;
+
+	unsigned int p;
+	unsigned int updated = 0;
+	if (update_pmatrices) {
+		for (p = 0; p < networkinfo->partition_count; ++p) {
+			/* only selected partitioned will be affected */
+			if (networkinfo_partition_active(networkinfo, p) && networkinfo->partitions[p]) {
+				pll_update_prob_matrices(networkinfo->partitions[p], networkinfo->param_indices[p],
+		                           arrays->pmatrix_indices,
+		                           arrays->branch_lengths,
+								   arrays->matrix_count);
+			}
+		}
+	}
+
+	for (p = 0; p < networkinfo->partition_count; ++p) {
+		if (!networkinfo->partitions[p]) {
+			/* this partition will be computed by another thread(s) */
+			networkinfo->partition_loglh[p] = 0.0;
+			continue;
+		}
+		/* all subsequent operation will affect current partition only */
+		pllmod_networkinfo_set_active_partition(networkinfo, (int) p);
+
+		pll_update_partials(networkinfo->partitions[p], arrays->operations, arrays->ops_count);
+		networkinfo->partition_loglh[p] = pll_compute_edge_loglikelihood(networkinfo->partitions[p], networkinfo->root->clv_index,
+				networkinfo->root->scaler_index, networkinfo->root->back->clv_index, networkinfo->root->back->scaler_index,
+				networkinfo->root->pmatrix_index, networkinfo->param_indices[p],
+				NULL);
+	}
+
+	/* sum up likelihood from all threads */
+	if (networkinfo->parallel_reduce_cb) {
+		networkinfo->parallel_reduce_cb(networkinfo->parallel_context, networkinfo->partition_loglh, p,
+		PLLMOD_COMMON_REDUCE_SUM);
+	}
+
+	/* accumulate loglh by summing up over all the partitions */
+	for (p = 0; p < networkinfo->partition_count; ++p)
+		total_loglh += networkinfo->partition_loglh[p];
+
+	/* restore original active partition */
+	pllmod_networkinfo_set_active_partition(networkinfo, old_active_partition);
+
+	assert(total_loglh < 0.);
+
+	return total_loglh;
 }
 
 PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) { // TODO: This still needs to be adapted to networks!!!
 	if (networkinfo->network->reticulation_count == 0) {
 		return pllmod_networkinfo_compute_loglh_tree(networkinfo, incremental, update_pmatrices);
+		// or pllmod_networkinfo_compute_loglh_displayed_tree(networkinfo, incremental, update_pmatrices, 0); ???
 	} else {
-		printf("pllmod_networkinfo_compute_loglh called but it hasn't been integrated yet. Returning a failure.\n");
-		return PLL_FAILURE; // TODO: this still needs to be implemented!
+		double network_likelihood = 1.0;
+		for (size_t i = 0; i < (1 << networkinfo->network->reticulation_count); ++i) {
+			double tree_logl = pllmod_networkinfo_compute_loglh_displayed_tree(networkinfo, 0, 1, i);
+			double tree_l = exp(tree_logl);
+			network_likelihood *= tree_l;
+		}
+		return log(network_likelihood);
 	}
 }
 
@@ -966,85 +999,67 @@ int pllmod_networkinfo_normalize_brlen_scalers(pllmod_networkinfo_t * networkinf
 	return PLL_SUCCESS;
 }
 
-static int networkinfo_check_network(pllmod_networkinfo_t * networkinfo,
-                               pll_unetwork_t * network)
-{
-  if (!networkinfo || !network)
-  {
-    pllmod_set_error(PLL_ERROR_PARAM_INVALID,
-                     "Parameter is NULL\n");
-    return PLL_FAILURE;
-  }
+static int networkinfo_check_network(pllmod_networkinfo_t * networkinfo, pll_unetwork_t * network) {
+	if (!networkinfo || !network) {
+		pllmod_set_error(PLL_ERROR_PARAM_INVALID, "Parameter is NULL\n");
+		return PLL_FAILURE;
+	}
 
-  if (networkinfo->network->tip_count != network->tip_count)
-  {
-    pllmod_set_error(PLLMOD_NETWORK_ERROR_INVALID_NETWORK_SIZE,
-                     "Invalid network size. Got %d instead of %d\n",
-					 network->tip_count, networkinfo->network->tip_count);
-    return PLL_FAILURE;
-  }
+	if (networkinfo->network->tip_count != network->tip_count) {
+		pllmod_set_error(PLLMOD_NETWORK_ERROR_INVALID_NETWORK_SIZE, "Invalid network size. Got %d instead of %d\n", network->tip_count,
+				networkinfo->network->tip_count);
+		return PLL_FAILURE;
+	}
 
-  if (!network->binary)
-  {
-    pllmod_set_error(PLLMOD_NETWORK_ERROR_INVALID_NETWORK,
-                     "Binary network expected\n");
-    return PLL_FAILURE;
-  }
+	if (!network->binary) {
+		pllmod_set_error(PLLMOD_NETWORK_ERROR_INVALID_NETWORK, "Binary network expected\n");
+		return PLL_FAILURE;
+	}
 
-  return PLL_SUCCESS;
+	return PLL_SUCCESS;
 }
 
-static int networkinfo_init_network(pllmod_networkinfo_t * networkinfo)
-{
-  pll_unetwork_t * network = networkinfo->network;
-  unsigned int node_count = network->tip_count + network->inner_tree_count + network->reticulation_count;
-  unsigned int edge_count = network->edge_count;
+static int networkinfo_init_network(pllmod_networkinfo_t * networkinfo) {
+	pll_unetwork_t * network = networkinfo->network;
+	unsigned int node_count = network->tip_count + network->inner_tree_count + network->reticulation_count;
+	unsigned int edge_count = network->edge_count;
 
-  /* save virtual root */
-  networkinfo->root = network->vroot;
+	/* save virtual root */
+	networkinfo->root = network->vroot;
 
-  /* 1. save back pointer to treeinfo stuct in in eacn node's _data_ field
-   * 2. collect branch length from the tree and store in a separate array
-   *    indexed by pmatrix_index */
-  for (unsigned int i = 0; i < node_count; ++i)
-  {
-    pll_unetwork_node_t * snode = network->nodes[i];
-    do
-    {
-      unsigned int pmat_idx = snode->pmatrix_index;
-      if (pmat_idx > edge_count)
-      {
-        pllmod_set_error(PLLMOD_NETWORK_ERROR_INVALID_NETWORK,
-                         "p-matrix index out of bounds (%u). "
-                         "networkinfo structure require that each branch "
-                         "branch is assigned a unique p-matrix index "
-                         "between 0 and branch_count-1\n",
-                         pmat_idx);
-        return PLL_FAILURE;
-      }
-      networkinfo->subnodes[snode->node_index] = snode;
-      networkinfo->branch_lengths[0][pmat_idx] = snode->length;
-      snode->data = networkinfo;
-      snode = snode->next;
-    }
-    while (snode && snode != network->nodes[i]);
-  }
+	/* 1. save back pointer to treeinfo stuct in in eacn node's _data_ field
+	 * 2. collect branch length from the tree and store in a separate array
+	 *    indexed by pmatrix_index */
+	for (unsigned int i = 0; i < node_count; ++i) {
+		pll_unetwork_node_t * snode = network->nodes[i];
+		do {
+			unsigned int pmat_idx = snode->pmatrix_index;
+			if (pmat_idx > edge_count) {
+				pllmod_set_error(PLLMOD_NETWORK_ERROR_INVALID_NETWORK, "p-matrix index out of bounds (%u). "
+						"networkinfo structure require that each branch "
+						"branch is assigned a unique p-matrix index "
+						"between 0 and branch_count-1\n", pmat_idx);
+				return PLL_FAILURE;
+			}
+			networkinfo->subnodes[snode->node_index] = snode;
+			networkinfo->branch_lengths[0][pmat_idx] = snode->length;
+			snode->data = networkinfo;
+			snode = snode->next;
+		} while (snode && snode != network->nodes[i]);
+	}
 
-  /* in unlinked branch length mode, copy brlen to other partitions */
-  if (networkinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED)
-  {
-    for (unsigned int i = 1; i < networkinfo->partition_count; ++i)
-    {
-      // TODO: only save brlens for initialized partitions
+	/* in unlinked branch length mode, copy brlen to other partitions */
+	if (networkinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED) {
+		for (unsigned int i = 1; i < networkinfo->partition_count; ++i) {
+			// TODO: only save brlens for initialized partitions
 //      if (networkinfo->partitions[i])
-      {
-        memcpy(networkinfo->branch_lengths[i], networkinfo->branch_lengths[0],
-               edge_count * sizeof(double));
-      }
-    }
-  }
+			{
+				memcpy(networkinfo->branch_lengths[i], networkinfo->branch_lengths[0], edge_count * sizeof(double));
+			}
+		}
+	}
 
-  return PLL_SUCCESS;
+	return PLL_SUCCESS;
 }
 
 PLL_EXPORT int pllmod_networkinfo_set_network(pllmod_networkinfo_t * networkinfo, pll_unetwork_t * network) {

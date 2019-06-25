@@ -1010,22 +1010,6 @@ static double treeinfo_compute_loglh(pllmod_treeinfo_t * treeinfo,
                               NULL,
                               &ops_count);
 
-  /*
-	// DEBUG: Print operations array
-	for (i = 0; i < ops_count; ++i)
-	{
-	  printf("operations[%d]:\n", i);
-	  printf("  parent_clv_index: %d\n", treeinfo->operations[i].parent_clv_index);
-	  printf("  parent_scaler_index: %d\n", treeinfo->operations[i].parent_scaler_index);
-	  printf("  child1_clv_index: %d\n", treeinfo->operations[i].child1_clv_index);
-	  printf("  child1_matrix_index: %d\n", treeinfo->operations[i].child1_matrix_index);
-	  printf("  child1_scaler_index: %d\n", treeinfo->operations[i].child1_scaler_index);
-	  printf("  child2_clv_index: %d\n", treeinfo->operations[i].child2_clv_index);
-	  printf("  child2_matrix_index: %d\n", treeinfo->operations[i].child2_matrix_index);
-	  printf("  child2_scaler_index: %d\n", treeinfo->operations[i].child2_scaler_index);
-	}
-	*/
-
   treeinfo->counter += ops_count;
 
 //  printf("Traversal size (%s): %u\n", incremental ? "part" : "full", ops_count);
