@@ -1902,8 +1902,8 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
       /* do not store the branch of the root, since it does not exist */
       if (i < trav_size-1)
       {
-        *(result->branch_lengths)++ = collect_branch_length_to_first_present_parent(node, present, tree_number);
-        *(result->pmatrix_indices)++ = node->pmatrix_index;
+        (result->branch_lengths)[result->matrix_count] = collect_branch_length_to_first_present_parent(node, present, tree_number);
+        (result->pmatrix_indices)[result->matrix_count] = node->pmatrix_index;
         result->matrix_count = result->matrix_count + 1;
       }
 
