@@ -846,7 +846,7 @@ static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * netwo
 double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices,
 		unsigned int tree_number) {
 	pll_displayed_tree_t * arrays = (pll_displayed_tree_t*) malloc(sizeof(pll_displayed_tree_t));
-	pllmod_unetwork_tree_buildarrays(networkinfo->network, tree_number, arrays);
+	pllmod_unetwork_tree_buildarrays(networkinfo->network, tree_number, arrays); // here smth is wrong! my operations array is wrong
 
 	/* network root must be an inner node! */
 	assert(!pllmod_unetwork_is_tip(networkinfo->root));
@@ -905,8 +905,8 @@ double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * ne
 
 PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) { // TODO: This still needs to be adapted to networks!!!
 	if (networkinfo->network->reticulation_count == 0) {
-		return pllmod_networkinfo_compute_loglh_tree(networkinfo, incremental, update_pmatrices);
-		// or pllmod_networkinfo_compute_loglh_displayed_tree(networkinfo, incremental, update_pmatrices, 0); ???
+		//return pllmod_networkinfo_compute_loglh_tree(networkinfo, incremental, update_pmatrices);
+		return pllmod_networkinfo_compute_loglh_displayed_tree(networkinfo, incremental, update_pmatrices, 0); //???
 	} else {
 		double network_likelihood = 1.0;
 		for (size_t i = 0; i < (1 << networkinfo->network->reticulation_count); ++i) {
