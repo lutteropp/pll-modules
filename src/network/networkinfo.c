@@ -188,7 +188,7 @@ int pllmod_networkinfo_set_parallel_context(pllmod_networkinfo_t * networkinfo, 
 
 PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networkinfo, unsigned int partition_index,
 		pll_partition_t * partition, int params_to_optimize, int gamma_mode, double alpha, const unsigned int * param_indices,
-		const int * subst_matrix_symmetries) { // TODO: Add 1 extra FAKE_CLV_VECTOR and FAKE_PMATRIX_ENTRY
+		const int * subst_matrix_symmetries) {
 	if (!networkinfo) {
 		pllmod_set_error(PLL_ERROR_PARAM_INVALID, "Networkinfo structure is NULL\n");
 		return PLL_FAILURE;
@@ -739,6 +739,11 @@ PLL_EXPORT void pllmod_networkinfo_invalidate_all(pllmod_networkinfo_t * network
 			for (m = 0; m < clv_count; ++m)
 				networkinfo->clv_valid[p][m] = 0;
 		}
+
+		// just ensure that fake node still has valid clv_index
+		networkinfo->clv_valid[p][networkinfo->fake_clv_index] = 1;
+		// just ensure that fake node still has valid pmatrix_index
+		networkinfo->pmatrix_valid[p][networkinfo->fake_pmatrix_index] = 1;
 	}
 }
 
@@ -761,6 +766,9 @@ PLL_EXPORT int pllmod_networkinfo_validate_clvs(pllmod_networkinfo_t * networkin
 				}
 			}
 		}
+
+		// just ensure that fake node still has valid clv_index
+		networkinfo->clv_valid[p][networkinfo->fake_clv_index] = 1;
 	}
 
 	return PLL_SUCCESS;
@@ -771,6 +779,9 @@ PLL_EXPORT void pllmod_networkinfo_invalidate_pmatrix(pllmod_networkinfo_t * net
 		unsigned int p = networkinfo->init_partition_idx[i];
 		if (networkinfo->pmatrix_valid[p] && networkinfo_partition_active(networkinfo, p))
 			networkinfo->pmatrix_valid[p][edge->pmatrix_index] = 0;
+
+		// just ensure that fake node still has valid pmatrix_index
+		networkinfo->pmatrix_valid[p][networkinfo->fake_pmatrix_index] = 1;
 	}
 }
 
@@ -779,6 +790,9 @@ PLL_EXPORT void pllmod_networkinfo_invalidate_clv(pllmod_networkinfo_t * network
 		unsigned int p = networkinfo->init_partition_idx[i];
 		if (networkinfo->clv_valid[p] && networkinfo_partition_active(networkinfo, p))
 			networkinfo->clv_valid[p][edge->node_index] = 0;
+
+		// just ensure that fake node still has valid clv_index
+		networkinfo->clv_valid[p][networkinfo->fake_clv_index] = 1;
 	}
 }
 
