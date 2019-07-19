@@ -215,7 +215,7 @@ PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networki
 	unsigned int pmatrix_count = branch_count;
 	unsigned int unetwork_count = inner_nodes_count * 3 + networkinfo->network->tip_count;
 
-	networkinfo->fake_clv_index = unetwork_count - 1;
+	networkinfo->fake_clv_index = networkinfo->network->tip_count + MAX_RETICULATION_COUNT;
 	networkinfo->fake_pmatrix_index = pmatrix_count - 1;
 
 	/* allocate invalidation arrays */
@@ -292,6 +292,13 @@ PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networki
 
 	// set clv to all-ones for the fake node
 	double* clv = partition->clv[networkinfo->fake_clv_index];
+
+	if (clv == NULL) {
+		// TODO: Does it work? Or do we need to increase the number of tips somehow when creating the partition?
+		partition->clv[networkinfo->fake_clv_index] = pll_aligned_alloc(sites * rate_cats * states_padded * sizeof(double), partition->alignment);
+		clv = partition->clv[networkinfo->fake_clv_index];
+	}
+
 	unsigned int n;
 	for (n = 0; n < sites; ++n)
 	{
@@ -305,10 +312,6 @@ PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networki
 	    clv += states_padded;
 	  }
 	}
-
-	// set the fake node to valid
-	networkinfo->clv_valid[partition_index][networkinfo->fake_clv_index] = (char) 1;
-	networkinfo->pmatrix_valid[partition_index][networkinfo->fake_pmatrix_index] = (char) 1;
 
 	return PLL_SUCCESS;
 }
@@ -739,11 +742,6 @@ PLL_EXPORT void pllmod_networkinfo_invalidate_all(pllmod_networkinfo_t * network
 			for (m = 0; m < clv_count; ++m)
 				networkinfo->clv_valid[p][m] = 0;
 		}
-
-		// just ensure that fake node still has valid clv_index
-		networkinfo->clv_valid[p][networkinfo->fake_clv_index] = 1;
-		// just ensure that fake node still has valid pmatrix_index
-		networkinfo->pmatrix_valid[p][networkinfo->fake_pmatrix_index] = 1;
 	}
 }
 
@@ -766,9 +764,6 @@ PLL_EXPORT int pllmod_networkinfo_validate_clvs(pllmod_networkinfo_t * networkin
 				}
 			}
 		}
-
-		// just ensure that fake node still has valid clv_index
-		networkinfo->clv_valid[p][networkinfo->fake_clv_index] = 1;
 	}
 
 	return PLL_SUCCESS;
@@ -779,9 +774,6 @@ PLL_EXPORT void pllmod_networkinfo_invalidate_pmatrix(pllmod_networkinfo_t * net
 		unsigned int p = networkinfo->init_partition_idx[i];
 		if (networkinfo->pmatrix_valid[p] && networkinfo_partition_active(networkinfo, p))
 			networkinfo->pmatrix_valid[p][edge->pmatrix_index] = 0;
-
-		// just ensure that fake node still has valid pmatrix_index
-		networkinfo->pmatrix_valid[p][networkinfo->fake_pmatrix_index] = 1;
 	}
 }
 
@@ -790,9 +782,6 @@ PLL_EXPORT void pllmod_networkinfo_invalidate_clv(pllmod_networkinfo_t * network
 		unsigned int p = networkinfo->init_partition_idx[i];
 		if (networkinfo->clv_valid[p] && networkinfo_partition_active(networkinfo, p))
 			networkinfo->clv_valid[p][edge->node_index] = 0;
-
-		// just ensure that fake node still has valid clv_index
-		networkinfo->clv_valid[p][networkinfo->fake_clv_index] = 1;
 	}
 }
 
