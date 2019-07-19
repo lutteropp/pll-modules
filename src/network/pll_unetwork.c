@@ -1882,7 +1882,7 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
 	}
 
     result->branch_lengths = (double *) malloc(branch_count * sizeof(double));
-    result->operations = (pll_operation_t *) malloc(inner_nodes_count * sizeof(pll_operation_t));
+    result->operations = (pll_operation_t *) malloc(network->inner_tree_count * sizeof(pll_operation_t));
     result->ops_count = 0;
     result->pmatrix_indices = (unsigned int *) malloc(branch_count * sizeof(unsigned int));
     result->matrix_count = 0;

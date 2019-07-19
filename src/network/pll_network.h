@@ -205,6 +205,10 @@ typedef struct networkinfo
   // parallelization stuff
   void * parallel_context;
   void (*parallel_reduce_cb)(void *, double *, size_t, int);
+
+  // fake entry for single-child nodes
+  unsigned int fake_clv_index;
+  unsigned int fake_pmatrix_index;
 } pllmod_networkinfo_t;
 
 typedef struct

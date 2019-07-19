@@ -188,7 +188,7 @@ int pllmod_networkinfo_set_parallel_context(pllmod_networkinfo_t * networkinfo, 
 
 PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networkinfo, unsigned int partition_index,
 		pll_partition_t * partition, int params_to_optimize, int gamma_mode, double alpha, const unsigned int * param_indices,
-		const int * subst_matrix_symmetries) {
+		const int * subst_matrix_symmetries) { // TODO: Add 1 extra FAKE_CLV_VECTOR and FAKE_PMATRIX_ENTRY
 	if (!networkinfo) {
 		pllmod_set_error(PLL_ERROR_PARAM_INVALID, "Networkinfo structure is NULL\n");
 		return PLL_FAILURE;
@@ -209,11 +209,14 @@ PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networki
 	networkinfo->alphas[partition_index] = alpha;
 
 	/* compute some derived dimensions */
-	unsigned int inner_nodes_count = networkinfo->network->tip_count - 2 + networkinfo->network->reticulation_count;
+	unsigned int inner_nodes_count = networkinfo->network->tip_count - 2 + MAX_RETICULATION_COUNT + 1; // +1 for the fake extra entry
 	unsigned int nodes_count = inner_nodes_count + networkinfo->network->tip_count;
 	unsigned int branch_count = nodes_count - 1;
 	unsigned int pmatrix_count = branch_count;
 	unsigned int unetwork_count = inner_nodes_count * 3 + networkinfo->network->tip_count;
+
+	networkinfo->fake_clv_index = unetwork_count - 1;
+	networkinfo->fake_pmatrix_index = pmatrix_count - 1;
 
 	/* allocate invalidation arrays */
 	networkinfo->clv_valid[partition_index] = (char *) calloc(unetwork_count, sizeof(char));
@@ -269,6 +272,43 @@ PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networki
 	}
 
 	memset(networkinfo->deriv_precomp[partition_index], 0, precomp_size * sizeof(double));
+
+	// set pmatrix to identity for the fake node
+	unsigned int states = partition->states;
+	unsigned int states_padded = partition->states_padded;
+	unsigned int sites = partition->sites;
+	unsigned int rate_cats = partition->rate_cats;
+	double * pmat = partition->pmatrix[networkinfo->fake_pmatrix_index];
+	unsigned int i, j, k;
+	for (i = 0; i < rate_cats; ++i)
+	{
+	  for (j = 0; j < states; ++j)
+	  {
+		for (k = 0; k < states; ++k)
+		  pmat[j*states_padded + k] = 1;
+	  }
+	  pmat +=  states*states_padded;
+	}
+
+	// set clv to all-ones for the fake node
+	double* clv = partition->clv[networkinfo->fake_clv_index];
+	unsigned int n;
+	for (n = 0; n < sites; ++n)
+	{
+	  for (i = 0; i < rate_cats; ++i)
+	  {
+	    for (j = 0; j < states; ++j)
+	    {
+	      clv[j] = 1;
+	    }
+
+	    clv += states_padded;
+	  }
+	}
+
+	// set the fake node to valid
+	networkinfo->clv_valid[networkinfo->fake_clv_index] = 1;
+	networkinfo->pmatrix_valid[networkinfo->fake_pmatrix_index] = 1;
 
 	return PLL_SUCCESS;
 }
@@ -846,7 +886,7 @@ static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * netwo
 double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices,
 		unsigned int tree_number) {
 	pll_displayed_tree_t * arrays = (pll_displayed_tree_t*) malloc(sizeof(pll_displayed_tree_t));
-	pllmod_unetwork_tree_buildarrays(networkinfo->network, tree_number, arrays); // here smth is wrong! my operations array is wrong
+	pllmod_unetwork_tree_buildarrays(networkinfo->network, tree_number, arrays); // here smth is wrong! my operations array for network is wrong
 
 	/* network root must be an inner node! */
 	assert(!pllmod_unetwork_is_tip(networkinfo->root));
