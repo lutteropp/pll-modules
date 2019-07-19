@@ -1859,7 +1859,7 @@ int cb_full_unetwork_traversal(pll_unetwork_node_t * node) {
 	return 1;
 }
 
-PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result) {
+PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result, unsigned int fake_clv_index, unsigned int fake_pmatrix_index) { // TODO: FIXME: replace path collapsing by using the fake node...
 	unsigned int nodes_count = network->reticulation_count + network->inner_tree_count + network->tip_count;
 	unsigned int inner_nodes_count = network->reticulation_count + network->inner_tree_count;
 	unsigned int branch_count = network->inner_tree_count * 2 + network->reticulation_count;
@@ -1870,7 +1870,7 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
 		return PLL_FAILURE;
 	}
 
-	int * present = (int *) calloc(nodes_count, sizeof(int));
+	/*int * present = (int *) calloc(nodes_count, sizeof(int));
 	unsigned int i;
 	for (i = 0; i < trav_size; ++i)
 	{
@@ -1879,10 +1879,11 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
 	  } else {
 		  present[trav_buffer[i]->clv_index] = 0;
 	  }
-	}
+	}*/
+	unsigned int i;
 
     result->branch_lengths = (double *) malloc(branch_count * sizeof(double));
-    result->operations = (pll_operation_t *) malloc(network->inner_tree_count * sizeof(pll_operation_t));
+    result->operations = (pll_operation_t *) malloc(inner_nodes_count * sizeof(pll_operation_t));
     result->ops_count = 0;
     result->pmatrix_indices = (unsigned int *) malloc(branch_count * sizeof(unsigned int));
     result->matrix_count = 0;
@@ -1893,21 +1894,23 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
     {
       pll_unetwork_node_t * node = trav_buffer[i];
 
-      if (pll_unetwork_is_reticulation(node))
+      /*if (pll_unetwork_is_reticulation(node))
       {
         free(present);
         return PLL_FAILURE; // because the reticulations should have been thrown out in the post-order tree-traversal already...
-      }
+      }*/
 
       /* do not store the branch of the root, since it does not exist */
       if (i < trav_size-1)
       {
-        (result->branch_lengths)[result->matrix_count] = collect_branch_length_to_first_present_parent(node, present, tree_number);
+    	(result->branch_lengths)[result->matrix_count] = node->length;
+        //(result->branch_lengths)[result->matrix_count] = collect_branch_length_to_first_present_parent(node, present, tree_number);
         (result->pmatrix_indices)[result->matrix_count] = node->pmatrix_index;
         result->matrix_count = result->matrix_count + 1;
       }
 
-      if (pll_unetwork_is_inner_tree(node)) // inner tree node
+      //if (pll_unetwork_is_inner_tree(node)) // inner tree node
+      if (!pll_unetwork_is_leaf(node)) // inner tree node
       {
         result->operations[result->ops_count].parent_clv_index = node->clv_index;
         result->operations[result->ops_count].parent_scaler_index = node->scaler_index;
@@ -1917,21 +1920,40 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
 
         pll_unetwork_node_t * child1 = NULL;
         pll_unetwork_node_t * child2 = NULL;
-        pll_unetwork_get_tree_children(node, &child1, &child2);
-        pll_unetwork_node_t * left = go_down_recursive(child1, present);
-        pll_unetwork_node_t * right = go_down_recursive(child2, present);
+        if (pll_unetwork_is_inner_tree(node)) {
+        	pll_unetwork_get_tree_children(node, &child1, &child2);
+        }
+        else {
+        	child1 = pll_unetwork_get_reticulation_child(node);
+        }
+        //pll_unetwork_node_t * left = go_down_recursive(child1, present);
+        //pll_unetwork_node_t * right = go_down_recursive(child2, present);
 
-        result->operations[result->ops_count].child1_clv_index = left->clv_index;
-        result->operations[result->ops_count].child1_scaler_index = left->scaler_index;
-        result->operations[result->ops_count].child1_matrix_index = left->pmatrix_index;
+        if (child1) {
+          assert(child1->active);
+          result->operations[result->ops_count].child1_clv_index = child1->clv_index;
+          result->operations[result->ops_count].child1_scaler_index = child1->scaler_index;
+          result->operations[result->ops_count].child1_matrix_index = child1->pmatrix_index;
+        } else {
+          result->operations[result->ops_count].child1_clv_index = fake_clv_index;
+          result->operations[result->ops_count].child1_scaler_index = -1;
+          result->operations[result->ops_count].child1_matrix_index = fake_pmatrix_index;
+        }
 
-        result->operations[result->ops_count].child2_clv_index = right->clv_index;
-        result->operations[result->ops_count].child2_scaler_index = right->scaler_index;
-        result->operations[result->ops_count].child2_matrix_index = right->pmatrix_index;
+        if (child2) {
+          assert(child2->active);
+          result->operations[result->ops_count].child2_clv_index = child2->clv_index;
+          result->operations[result->ops_count].child2_scaler_index = child2->scaler_index;
+          result->operations[result->ops_count].child2_matrix_index = child2->pmatrix_index;
+        } else {
+          result->operations[result->ops_count].child2_clv_index = fake_clv_index;
+          result->operations[result->ops_count].child2_scaler_index = -1;
+          result->operations[result->ops_count].child2_matrix_index = fake_pmatrix_index;
+        }
 
         result->ops_count = result->ops_count + 1;
       }
     }
-    free(present);
+    //free(present);
 	return PLL_SUCCESS;
 }

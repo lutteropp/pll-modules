@@ -307,8 +307,8 @@ PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networki
 	}
 
 	// set the fake node to valid
-	networkinfo->clv_valid[networkinfo->fake_clv_index] = 1;
-	networkinfo->pmatrix_valid[networkinfo->fake_pmatrix_index] = 1;
+	networkinfo->clv_valid[partition_index][networkinfo->fake_clv_index] = (char) 1;
+	networkinfo->pmatrix_valid[partition_index][networkinfo->fake_pmatrix_index] = (char) 1;
 
 	return PLL_SUCCESS;
 }
@@ -900,7 +900,7 @@ static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * netwo
 double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices,
 		unsigned int tree_number) {
 	pll_displayed_tree_t * arrays = (pll_displayed_tree_t*) malloc(sizeof(pll_displayed_tree_t));
-	pllmod_unetwork_tree_buildarrays(networkinfo->network, tree_number, arrays); // here smth is wrong! my operations array for network is wrong
+	pllmod_unetwork_tree_buildarrays(networkinfo->network, tree_number, arrays, networkinfo->fake_clv_index, networkinfo->fake_pmatrix_index);
 
 	/* network root must be an inner node! */
 	assert(!pllmod_unetwork_is_tip(networkinfo->root));
