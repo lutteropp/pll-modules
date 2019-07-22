@@ -946,7 +946,7 @@ double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * ne
 	return total_loglh;
 }
 
-PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) { // TODO: This still needs to be adapted to networks!!!
+PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) {
 	if (networkinfo->network->reticulation_count == 0) {
 		//return pllmod_networkinfo_compute_loglh_tree(networkinfo, incremental, update_pmatrices);
 		return pllmod_networkinfo_compute_loglh_displayed_tree(networkinfo, incremental, update_pmatrices, 0); //???

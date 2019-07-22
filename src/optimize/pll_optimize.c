@@ -969,7 +969,7 @@ static int recomp_iterative (pll_newton_tree_params_t * params,
  * reproducible if several branches are optimized in parallel.
  *
  * @param[in,out]  partition         the PLL partition structure
- * @param[in,out]  tree              the PLL unrotted tree structure
+ * @param[in,out]  tree              the PLL unrooted tree structure
  * @param  params_indices    the indices of the parameter sets
  * @param  branch_length_min lower bound for branch lengths
  * @param  branch_length_max upper bound for branch lengths
@@ -2447,7 +2447,7 @@ cleanup:
  *
  * @param[in,out]  partitions list of partitions
  * @param  partition_count    number of partitions in `partitions`
- * @param[in,out]  tree       the PLL unrooted tree structure
+ * @param[in,out]  network    the PLL unrooted network structure
  * @param  params_indices     the indices of the parameter sets
  * @param  precomp_buffers    buffer for sumtable (NULL=allocate internally)
  * @param  brlen_buffers      buffer for branch lengths (NULL=allocate internally)
@@ -2520,6 +2520,7 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi_network (
                        brlen_buffers, brlen_scalers, network);
 
   /* get the initial likelihood score */
+  // TODO: Is this correct, or do we need to use our own network loglikelihood function?
   loglikelihood = pllmod_opt_compute_edge_loglikelihood_multi (
                                                       partitions,
                                                       partition_count,
@@ -2581,6 +2582,7 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi_network (
 
     /* iterate on first edge */
     params.network = network;
+    // TODO: Here it segfaults
     if (!recomp_iterative_multi_network (&params, radius, &new_loglikelihood, keep_update))
     {
       assert(pll_errno);

@@ -1929,8 +1929,7 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
         //pll_unetwork_node_t * left = go_down_recursive(child1, present);
         //pll_unetwork_node_t * right = go_down_recursive(child2, present);
 
-        if (child1) {
-          assert(child1->active);
+        if (child1 && child1->active) {
           result->operations[result->ops_count].child1_clv_index = child1->clv_index;
           result->operations[result->ops_count].child1_scaler_index = child1->scaler_index;
           result->operations[result->ops_count].child1_matrix_index = child1->pmatrix_index;
@@ -1940,8 +1939,7 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
           result->operations[result->ops_count].child1_matrix_index = fake_pmatrix_index;
         }
 
-        if (child2) {
-          assert(child2->active);
+        if (child2 && child2->active) {
           result->operations[result->ops_count].child2_clv_index = child2->clv_index;
           result->operations[result->ops_count].child2_scaler_index = child2->scaler_index;
           result->operations[result->ops_count].child2_matrix_index = child2->pmatrix_index;
