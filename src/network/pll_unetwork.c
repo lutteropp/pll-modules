@@ -1870,16 +1870,6 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
 		return PLL_FAILURE;
 	}
 
-	/*int * present = (int *) calloc(nodes_count, sizeof(int));
-	unsigned int i;
-	for (i = 0; i < trav_size; ++i)
-	{
-	  if (pll_unetwork_is_leaf(trav_buffer[i]) || pll_unetwork_count_active_outgoing(trav_buffer[i]) >= 2) {
-		  present[trav_buffer[i]->clv_index] = 1;
-	  } else {
-		  present[trav_buffer[i]->clv_index] = 0;
-	  }
-	}*/
 	unsigned int i;
 
     result->branch_lengths = (double *) malloc(branch_count * sizeof(double));
@@ -1894,22 +1884,14 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
     {
       pll_unetwork_node_t * node = trav_buffer[i];
 
-      /*if (pll_unetwork_is_reticulation(node))
-      {
-        free(present);
-        return PLL_FAILURE; // because the reticulations should have been thrown out in the post-order tree-traversal already...
-      }*/
-
       /* do not store the branch of the root, since it does not exist */
       if (i < trav_size-1)
       {
     	(result->branch_lengths)[result->matrix_count] = node->length;
-        //(result->branch_lengths)[result->matrix_count] = collect_branch_length_to_first_present_parent(node, present, tree_number);
         (result->pmatrix_indices)[result->matrix_count] = node->pmatrix_index;
         result->matrix_count = result->matrix_count + 1;
       }
 
-      //if (pll_unetwork_is_inner_tree(node)) // inner tree node
       if (!pll_unetwork_is_leaf(node)) // inner tree node
       {
         result->operations[result->ops_count].parent_clv_index = node->clv_index;
@@ -1926,8 +1908,6 @@ PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64
         else {
         	child1 = pll_unetwork_get_reticulation_child(node);
         }
-        //pll_unetwork_node_t * left = go_down_recursive(child1, present);
-        //pll_unetwork_node_t * right = go_down_recursive(child2, present);
 
         if (child1 && child1->active) {
           result->operations[result->ops_count].child1_clv_index = child1->clv_index;

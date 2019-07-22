@@ -785,7 +785,7 @@ PLL_EXPORT void pllmod_networkinfo_invalidate_clv(pllmod_networkinfo_t * network
 	}
 }
 
-static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) { // TODO: This still needs to be adapted to networks!!!
+static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) {
 	/* network root must be an inner node! */
 	assert(!pllmod_unetwork_is_tip(networkinfo->root));
 
