@@ -280,14 +280,12 @@ PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networki
 	unsigned int rate_cats = partition->rate_cats;
 	double * pmat = partition->pmatrix[networkinfo->fake_pmatrix_index];
 	unsigned int i, j, k;
-	for (i = 0; i < rate_cats; ++i)
-	{
-	  for (j = 0; j < states; ++j)
-	  {
-		for (k = 0; k < states; ++k)
-		  pmat[j*states_padded + k] = 1;
-	  }
-	  pmat +=  states*states_padded;
+	for (i = 0; i < rate_cats; ++i) {
+		for (j = 0; j < states; ++j) {
+			for (k = 0; k < states; ++k)
+				pmat[j * states_padded + k] = 1;
+		}
+		pmat += states * states_padded;
 	}
 
 	// set clv to all-ones for the fake node
@@ -295,22 +293,20 @@ PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networki
 
 	if (clv == NULL) {
 		// TODO: Does it work? Or do we need to increase the number of tips somehow when creating the partition?
-		partition->clv[networkinfo->fake_clv_index] = pll_aligned_alloc(sites * rate_cats * states_padded * sizeof(double), partition->alignment);
+		partition->clv[networkinfo->fake_clv_index] = pll_aligned_alloc(sites * rate_cats * states_padded * sizeof(double),
+				partition->alignment);
 		clv = partition->clv[networkinfo->fake_clv_index];
 	}
 
 	unsigned int n;
-	for (n = 0; n < sites; ++n)
-	{
-	  for (i = 0; i < rate_cats; ++i)
-	  {
-	    for (j = 0; j < states; ++j)
-	    {
-	      clv[j] = 1;
-	    }
+	for (n = 0; n < sites; ++n) {
+		for (i = 0; i < rate_cats; ++i) {
+			for (j = 0; j < states; ++j) {
+				clv[j] = 1;
+			}
 
-	    clv += states_padded;
-	  }
+			clv += states_padded;
+		}
 	}
 
 	return PLL_SUCCESS;
@@ -889,7 +885,8 @@ static double pllmod_networkinfo_compute_loglh_tree(pllmod_networkinfo_t * netwo
 double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices,
 		unsigned int tree_number) {
 	pll_displayed_tree_t * arrays = (pll_displayed_tree_t*) malloc(sizeof(pll_displayed_tree_t));
-	pllmod_unetwork_tree_buildarrays(networkinfo->network, tree_number, arrays, networkinfo->fake_clv_index, networkinfo->fake_pmatrix_index);
+	pllmod_unetwork_tree_build_operations(networkinfo->network, tree_number, arrays, networkinfo->fake_clv_index,
+			networkinfo->fake_pmatrix_index);
 
 	/* network root must be an inner node! */
 	assert(!pllmod_unetwork_is_tip(networkinfo->root));
@@ -900,17 +897,6 @@ double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * ne
 
 	unsigned int p;
 	unsigned int updated = 0;
-	if (update_pmatrices) {
-		for (p = 0; p < networkinfo->partition_count; ++p) {
-			/* only selected partitioned will be affected */
-			if (networkinfo_partition_active(networkinfo, p) && networkinfo->partitions[p]) {
-				pll_update_prob_matrices(networkinfo->partitions[p], networkinfo->param_indices[p],
-		                           arrays->pmatrix_indices,
-		                           arrays->branch_lengths,
-								   arrays->matrix_count);
-			}
-		}
-	}
 
 	for (p = 0; p < networkinfo->partition_count; ++p) {
 		if (!networkinfo->partitions[p]) {
@@ -947,6 +933,32 @@ double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * ne
 }
 
 PLL_EXPORT double pllmod_networkinfo_compute_loglh(pllmod_networkinfo_t * networkinfo, int incremental, int update_pmatrices) {
+	const double LOGLH_NONE = (double) NAN;
+	unsigned int i;
+	unsigned int traversal_size;
+	/* NOTE: in unlinked brlen mode, up-to-date brlens for partition p
+	 * have to be prefetched to networkinfo->branch_lengths[p] !!! */
+	int collect_brlen = (networkinfo->brlen_linkage == PLLMOD_COMMON_BRLEN_UNLINKED ? 0 : 1);
+	pllmod_networkinfo_set_active_partition(networkinfo, PLLMOD_NETWORKINFO_PARTITION_ALL);
+	/* we need full traversal in 2 cases: 1) update p-matrices, 2) update all CLVs */
+	if (update_pmatrices && collect_brlen) {
+		/* perform a FULL postorder traversal of the network */
+		if (!pll_unetwork_traverse(networkinfo->root,
+		PLL_NETWORK_TRAVERSE_POSTORDER, cb_full_traversal_network, networkinfo->travbuffer, &traversal_size))
+			return LOGLH_NONE;
+	}
+	/* update p-matrices if asked for */
+	if (update_pmatrices) {
+		if (collect_brlen) {
+			for (i = 0; i < traversal_size; ++i) {
+				pll_unetwork_node_t * node = networkinfo->travbuffer[i];
+				networkinfo->branch_lengths[0][node->pmatrix_index] = node->length;
+			}
+		}
+
+		pllmod_networkinfo_update_prob_matrices(networkinfo, !incremental);
+	}
+
 	if (networkinfo->network->reticulation_count == 0) {
 		//return pllmod_networkinfo_compute_loglh_tree(networkinfo, incremental, update_pmatrices);
 		return pllmod_networkinfo_compute_loglh_displayed_tree(networkinfo, incremental, update_pmatrices, 0); //???

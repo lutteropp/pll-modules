@@ -67,15 +67,12 @@
 
 typedef struct pll_displayed_tree_s
 {
-  double * branch_lengths;
   pll_operation_t * operations;
   unsigned int ops_count;
-  unsigned int * pmatrix_indices;
-  unsigned int matrix_count;
 } pll_displayed_tree_t;
 
-PLL_EXPORT int pllmod_rnetwork_tree_buildarrays(pll_rnetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result);
-PLL_EXPORT int pllmod_unetwork_tree_buildarrays(pll_unetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result, unsigned int fake_clv_index, unsigned int fake_pmatrix_index);
+PLL_EXPORT int pllmod_rnetwork_tree_build_operations(pll_rnetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result, unsigned int fake_clv_index, unsigned int fake_pmatrix_index);
+PLL_EXPORT int pllmod_unetwork_tree_build_operations(pll_unetwork_t * network, uint64_t tree_number, pll_displayed_tree_t * result, unsigned int fake_clv_index, unsigned int fake_pmatrix_index);
 
 typedef struct pll_network_edge
 {
