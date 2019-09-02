@@ -929,6 +929,8 @@ double pllmod_networkinfo_compute_loglh_displayed_tree(pllmod_networkinfo_t * ne
 
 	assert(total_loglh < 0.);
 
+	free(arrays);
+
 	return total_loglh;
 }
 
