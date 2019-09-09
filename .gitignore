@@ -58,6 +58,7 @@ m4/pkg.m4
 .lib
 .libs/
 .dirstamp
+build
 
 # eclipse project files
 .cproject
