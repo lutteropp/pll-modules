@@ -215,7 +215,7 @@ PLL_EXPORT int pllmod_networkinfo_init_partition(pllmod_networkinfo_t * networki
 	unsigned int pmatrix_count = branch_count;
 	unsigned int unetwork_count = inner_nodes_count * 3 + networkinfo->network->tip_count;
 
-	networkinfo->fake_clv_index = networkinfo->network->tip_count + MAX_RETICULATION_COUNT;
+	networkinfo->fake_clv_index = networkinfo->network->tip_count + MAX_RETICULATION_COUNT; // TODO: THIS LOOKS WRONG!!! FIXME!!!
 	networkinfo->fake_pmatrix_index = pmatrix_count - 1;
 
 	/* allocate invalidation arrays */
