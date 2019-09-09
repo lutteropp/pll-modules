@@ -261,6 +261,14 @@ typedef struct treeinfo
   // parallelization stuff
   void * parallel_context;
   void (*parallel_reduce_cb)(void *, double *, size_t, int);
+
+
+  // hijacked likelihood computation stuff
+  void * likelihood_computation_params;
+  double (*likelihood_target_function)(void *, // the likelihood_computation_params
+					   int, // incremental
+					   int); // update_pmatrices
+
 } pllmod_treeinfo_t;
 
 typedef struct

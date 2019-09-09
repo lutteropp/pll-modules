@@ -27,6 +27,10 @@ static int treeinfo_check_tree(pllmod_treeinfo_t * treeinfo,
                                pll_utree_t * tree);
 static int treeinfo_init_tree(pllmod_treeinfo_t * treeinfo);
 
+static double treeinfo_compute_loglh(pllmod_treeinfo_t * treeinfo,
+                                     int incremental,
+                                     int update_pmatrices);
+
 /* a callback function for performing a full traversal */
 static int cb_full_traversal(pll_unode_t * node)
 {
@@ -208,6 +212,10 @@ PLL_EXPORT pllmod_treeinfo_t * pllmod_treeinfo_create(pll_unode_t * root,
   }
 
   assert(treeinfo->tree && treeinfo->tree->tip_count == tips);
+
+  // hijacked likelihood computation stuff
+  treeinfo->likelihood_computation_params = (void*) treeinfo;
+  treeinfo->likelihood_target_function = treeinfo_compute_loglh;
 
   return treeinfo;
 }
@@ -1078,14 +1086,16 @@ static double treeinfo_compute_loglh(pllmod_treeinfo_t * treeinfo,
 PLL_EXPORT double pllmod_treeinfo_compute_loglh(pllmod_treeinfo_t * treeinfo,
                                                 int incremental)
 {
-  return treeinfo_compute_loglh(treeinfo, incremental, 1);
+  return treeinfo->likelihood_target_function(treeinfo->likelihood_computation_params, incremental, 1);
+  //return treeinfo_compute_loglh(treeinfo, incremental, 1);
 }
 
 PLL_EXPORT double pllmod_treeinfo_compute_loglh_flex(pllmod_treeinfo_t * treeinfo,
                                                      int incremental,
                                                      int update_pmatrices)
 {
-  return treeinfo_compute_loglh(treeinfo, incremental, update_pmatrices);
+  return treeinfo->likelihood_target_function(treeinfo->likelihood_computation_params, incremental, 1);
+  //return treeinfo_compute_loglh(treeinfo, incremental, update_pmatrices);
 }
 
 PLL_EXPORT
