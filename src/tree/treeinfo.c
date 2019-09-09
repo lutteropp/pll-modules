@@ -27,7 +27,7 @@ static int treeinfo_check_tree(pllmod_treeinfo_t * treeinfo,
                                pll_utree_t * tree);
 static int treeinfo_init_tree(pllmod_treeinfo_t * treeinfo);
 
-static double treeinfo_compute_loglh(pllmod_treeinfo_t * treeinfo,
+static double treeinfo_compute_loglh(void * treeinfo_param,
                                      int incremental,
                                      int update_pmatrices);
 
@@ -949,10 +949,12 @@ PLL_EXPORT void pllmod_treeinfo_invalidate_clv(pllmod_treeinfo_t * treeinfo,
   }
 }
 
-static double treeinfo_compute_loglh(pllmod_treeinfo_t * treeinfo,
+static double treeinfo_compute_loglh(void * treeinfo_param,
                                      int incremental,
                                      int update_pmatrices)
 {
+  pllmod_treeinfo_t* treeinfo = (pllmod_treeinfo_t*) treeinfo_param;
+
   /* tree root must be an inner node! */
   assert(!pllmod_utree_is_tip(treeinfo->root));
 
