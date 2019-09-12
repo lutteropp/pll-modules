@@ -273,6 +273,12 @@ typedef struct treeinfo
   double (*likelihood_target_function)(void *, // the likelihood_computation_params
 					   int, // incremental
 					   int); // update_pmatrices
+
+  // default likelihood stuff
+  double (*default_likelihood_target_function)(void *, // the likelihood_computation_params
+  					   int, // incremental
+  					   int); // update_pmatrices
+  void * default_likelihood_computation_params;
   // hijacked branch length optimization stuff
   double (*opt_brlen_function)(pllmod_treeinfo_t *, // treeinfo
                                         double, // min_brlen
