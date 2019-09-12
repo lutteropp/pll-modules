@@ -71,27 +71,6 @@ static int treeinfo_partition_active(pllmod_treeinfo_t * treeinfo,
           treeinfo->active_partition == (int) partition_index);
 }
 
-// some forward declarations
-double pllmod_algo_opt_brlen_treeinfo(pllmod_treeinfo_t * treeinfo,
-                                      double min_brlen,
-                                      double max_brlen,
-                                      double lh_epsilon,
-                                      int max_iters,
-                                      int opt_method,
-                                      int radius);
-double pllmod_algo_spr_round(pllmod_treeinfo_t * treeinfo,
-                                        unsigned int radius_min,
-                                        unsigned int radius_max,
-                                        unsigned int ntopol_keep,
-                                        pll_bool_t thorough,
-                                        int brlen_opt_method,
-                                        double bl_min,
-                                        double bl_max,
-                                        int smoothings,
-                                        double epsilon,
-                                        cutoff_info_t * cutoff_info,
-                                        double subtree_cutoff);
-
 PLL_EXPORT pllmod_treeinfo_t * pllmod_treeinfo_create(pll_unode_t * root,
                                                       unsigned int tips,
                                                       unsigned int partitions,
@@ -240,10 +219,6 @@ PLL_EXPORT pllmod_treeinfo_t * pllmod_treeinfo_create(pll_unode_t * root,
   // default likelihood computation stuff
   treeinfo->default_likelihood_computation_params = (void*) treeinfo;
   treeinfo->default_likelihood_target_function = treeinfo_compute_loglh;
-  // hijacked other functions
-  treeinfo->opt_brlen_function = pllmod_algo_opt_brlen_treeinfo;
-  treeinfo->spr_round_function = pllmod_algo_spr_round;
-  treeinfo->compute_ancestral_function = pllmod_treeinfo_compute_ancestral;
 
   return treeinfo;
 }
