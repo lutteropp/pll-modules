@@ -216,6 +216,10 @@ PLL_EXPORT pllmod_treeinfo_t * pllmod_treeinfo_create(pll_unode_t * root,
   // hijacked likelihood computation stuff
   treeinfo->likelihood_computation_params = (void*) treeinfo;
   treeinfo->likelihood_target_function = treeinfo_compute_loglh;
+  // hijacked other functions
+  treeinfo->opt_brlen_function = pllmod_algo_opt_brlen_treeinfo;
+  treeinfo->spr_round_function = pllmod_algo_spr_round;
+  treeinfo->compute_ancestral_function = pllmod_treeinfo_compute_ancestral;
 
   return treeinfo;
 }

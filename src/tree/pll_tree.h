@@ -205,6 +205,30 @@ typedef struct treeinfo_topology
   double ** branch_lengths;
 } pllmod_treeinfo_topology_t;
 
+// lots of forward declarations
+typedef struct cutoff_info cutoff_info_t; // forward declaration
+typedef struct treeinfo pllmod_treeinfo_t; // forward declaration
+typedef struct ancestral pllmod_ancestral_t; // forward declaration
+double pllmod_algo_opt_brlen_treeinfo(pllmod_treeinfo_t * treeinfo,
+                                      double min_brlen,
+                                      double max_brlen,
+                                      double lh_epsilon,
+                                      int max_iters,
+                                      int opt_method,
+                                      int radius);
+double pllmod_algo_spr_round(pllmod_treeinfo_t * treeinfo,
+                                        unsigned int radius_min,
+                                        unsigned int radius_max,
+                                        unsigned int ntopol_keep,
+                                        pll_bool_t thorough,
+                                        int brlen_opt_method,
+                                        double bl_min,
+                                        double bl_max,
+                                        int smoothings,
+                                        double epsilon,
+                                        cutoff_info_t * cutoff_info,
+                                        double subtree_cutoff);
+
 typedef struct treeinfo
 {
   // dimensions
@@ -268,10 +292,33 @@ typedef struct treeinfo
   double (*likelihood_target_function)(void *, // the likelihood_computation_params
 					   int, // incremental
 					   int); // update_pmatrices
+  // hijacked branch length optimization stuff
+  double (*opt_brlen_function)(pllmod_treeinfo_t *, // treeinfo
+                                        double, // min_brlen
+                                        double, // max_brlen
+                                        double, // lh_epsilon
+                                        int, // max_iters
+                                        int, // opt_method
+                                        int); // radius
+  // hijacked spr round stuff
+  double (*spr_round_function)(pllmod_treeinfo_t *, // treeinfo
+                                          unsigned int, // radius_min
+                                          unsigned int, // radius_max
+                                          unsigned int, // ntopol_keep
+                                          pll_bool_t, // thorough
+                                          int, // brlen_opt_method
+                                          double, // bl_min
+                                          double, // bl_max
+                                          int, // smoothings
+                                          double, // epsilon
+                                          cutoff_info_t *, // cutoff_info
+                                          double); // subtree_cutoff
+  // hijacked compute ancestral stuff
+  pllmod_ancestral_t * (*compute_ancestral_function)(pllmod_treeinfo_t *); // treeinfo
 
 } pllmod_treeinfo_t;
 
-typedef struct
+typedef struct ancestral
 {
   unsigned int node_count;
   pll_unode_t ** nodes;
