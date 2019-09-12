@@ -209,25 +209,6 @@ typedef struct treeinfo_topology
 typedef struct cutoff_info cutoff_info_t; // forward declaration
 typedef struct treeinfo pllmod_treeinfo_t; // forward declaration
 typedef struct ancestral pllmod_ancestral_t; // forward declaration
-double pllmod_algo_opt_brlen_treeinfo(pllmod_treeinfo_t * treeinfo,
-                                      double min_brlen,
-                                      double max_brlen,
-                                      double lh_epsilon,
-                                      int max_iters,
-                                      int opt_method,
-                                      int radius);
-double pllmod_algo_spr_round(pllmod_treeinfo_t * treeinfo,
-                                        unsigned int radius_min,
-                                        unsigned int radius_max,
-                                        unsigned int ntopol_keep,
-                                        pll_bool_t thorough,
-                                        int brlen_opt_method,
-                                        double bl_min,
-                                        double bl_max,
-                                        int smoothings,
-                                        double epsilon,
-                                        cutoff_info_t * cutoff_info,
-                                        double subtree_cutoff);
 
 typedef struct treeinfo
 {
