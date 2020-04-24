@@ -1099,7 +1099,7 @@ PLL_EXPORT double pllmod_treeinfo_compute_loglh_flex(pllmod_treeinfo_t * treeinf
                                                      int incremental,
                                                      int update_pmatrices)
 {
-  return treeinfo->likelihood_target_function(treeinfo->likelihood_computation_params, incremental, 1);
+  return treeinfo->likelihood_target_function(treeinfo->likelihood_computation_params, incremental, update_pmatrices);
   //return treeinfo_compute_loglh(treeinfo, incremental, update_pmatrices);
 }
 
