@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2015-18 Diego Darriba, Alexey Kozlov
+ Copyright (C) 2015-20 Diego Darriba, Alexey Kozlov
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU Affero General Public License as
@@ -947,7 +947,7 @@ static int recomp_iterative (pll_newton_tree_params_t * params,
  * reproducible if several branches are optimized in parallel.
  *
  * @param[in,out]  partition         the PLL partition structure
- * @param[in,out]  tree              the PLL unrotted tree structure
+ * @param[in,out]  tree              the PLL unrooted tree structure
  * @param  params_indices    the indices of the parameter sets
  * @param  branch_length_min lower bound for branch lengths
  * @param  branch_length_max upper bound for branch lengths
@@ -1102,7 +1102,7 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local (
  * Check `pllmod_opt_optimize_branch_lengths_local` documentation.
  *
  * @param[in,out]  partition         the PLL partition structure
- * @param[in,out]  tree              the PLL unrotted tree structure
+ * @param[in,out]  tree              the PLL unrooted tree structure
  * @param  params_indices    the indices of the parameter sets
  * @param  branch_length_min lower bound for branch lengths
  * @param  branch_length_max upper bound for branch lengths
@@ -1271,8 +1271,10 @@ static void utree_derivative_func_multi (void * parameters, double * proposal,
   {
     if (unlinked)
     {
-      params->parallel_reduce_cb(params->parallel_context, df, p, PLLMOD_COMMON_REDUCE_SUM);
-      params->parallel_reduce_cb(params->parallel_context, ddf, p, PLLMOD_COMMON_REDUCE_SUM);
+      params->parallel_reduce_cb(params->parallel_context, df, 
+                                 params->partition_count, PLLMOD_COMMON_REDUCE_SUM);
+      params->parallel_reduce_cb(params->parallel_context, ddf,
+                                 params->partition_count, PLLMOD_COMMON_REDUCE_SUM);
     }
     else
     {
@@ -1552,7 +1554,13 @@ static int recomp_iterative_multi(pll_newton_tree_params_multi_t * params,
   /* update branch length in the buffer and/or in the tree structure */
   for (p = 0; p < xnum; ++p)
   {
-    assert(xguess[p] >= xmin && xguess[p] <= xmax);
+    if (xguess[p] < xmin || xguess[p] > xmax)
+    {
+      printf("BRLEN out-of-bounds: xmin/xmax/xguess/p:  %.18lf    %.18lf    %.18lf    %u\n", 
+              xmin, xmax, xguess[p], p);
+      fflush(0);
+      assert(0);
+    }
 
     // ignore small changes in BL
     if (fabs(xguess[p] - xorig[p]) < 1e-10)
@@ -1895,7 +1903,7 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local_multi (
         assert(new_loglikelihood - loglikelihood > new_loglikelihood * BETTER_LL_TRESHOLD);
       else if (opt_method == PLLMOD_OPT_BLO_NEWTON_FALLBACK)
       {
-        // reset branch lenghts
+        // reset branch lengths
         params.opt_method = PLLMOD_OPT_BLO_NEWTON_SAFE;
         iters = (unsigned int) max_iters;
       }
