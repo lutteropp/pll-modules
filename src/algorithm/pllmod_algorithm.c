@@ -707,19 +707,32 @@ static void fix_brlen_scalers(pllmod_treeinfo_t * treeinfo,
 
 static pll_bool_t fix_brlen_minmax(pllmod_treeinfo_t * treeinfo, double blmin, double blmax)
 {
+  assert (treeinfo->brlen_linkage != PLLMOD_COMMON_BRLEN_UNLINKED);
   pll_bool_t brlen_fixed = PLL_FALSE;
-  for (unsigned int i = 0; i < treeinfo->subnode_count; ++i)
-  {
-    pll_unode_t * snode = treeinfo->subnodes[i];
-    if (snode->length < blmin)
+  if (treeinfo->subnode_count > 0) {
+    for (unsigned int i = 0; i < treeinfo->subnode_count; ++i)
     {
-      pllmod_treeinfo_set_branch_length(treeinfo, snode, blmin);
-      brlen_fixed = PLL_TRUE;
+      pll_unode_t * snode = treeinfo->subnodes[i];
+      if (snode->length < blmin)
+      {
+        pllmod_treeinfo_set_branch_length(treeinfo, snode, blmin);
+        brlen_fixed = PLL_TRUE;
+      }
+      else if (snode->length > blmax)
+      {
+        pllmod_treeinfo_set_branch_length(treeinfo, snode, blmax);
+        brlen_fixed = PLL_TRUE;
+      }
     }
-    else if (snode->length > blmax)
-    {
-      pllmod_treeinfo_set_branch_length(treeinfo, snode, blmax);
-      brlen_fixed = PLL_TRUE;
+  } else {
+    for (unsigned int i = 0; i < treeinfo->tree->edge_count; ++i) {
+      if (treeinfo->branch_lengths[0][i] < blmin) {
+        treeinfo->branch_lengths[0][i] = blmin;
+        brlen_fixed = PLL_TRUE;
+      } else if (treeinfo->branch_lengths[p][i] > blmax) {
+        treeinfo->branch_lengths[0][i] = blmax;
+        brlen_fixed = PLL_TRUE;
+      }
     }
   }
 
@@ -920,13 +933,19 @@ double pllmod_algo_opt_brlen_scalers_treeinfo(pllmod_treeinfo_t * treeinfo,
       assert(j == treeinfo->init_partition_count);
 
       /* restore branch lengths */
-      for (i = 0; i < treeinfo->subnode_count; ++i)
-      {
-        pll_unode_t * snode = treeinfo->subnodes[i];
-        if (snode->node_index < snode->back->node_index)
+      if (treeinfo->subnode_count > 0){
+        for (i = 0; i < treeinfo->subnode_count; ++i)
         {
-          pllmod_treeinfo_set_branch_length(treeinfo, snode,
-                                            old_brlen[snode->pmatrix_index]);
+          pll_unode_t * snode = treeinfo->subnodes[i];
+          if (snode->node_index < snode->back->node_index)
+          {
+            pllmod_treeinfo_set_branch_length(treeinfo, snode,
+                                              old_brlen[snode->pmatrix_index]);
+          }
+        }
+      } else {
+        for (i = 0; i < treeinfo->tree->edge_count; ++i) {
+          treeinfo->branch_lengths[0][i] = old_brlen[i];
         }
       }
 
@@ -1778,8 +1797,15 @@ double pllmod_algo_opt_rates_weights_treeinfo (pllmod_treeinfo_t * treeinfo,
           }
         }
         /* restore initial branch lengths */
-        for (i = 0; i < treeinfo->subnode_count; ++i)
-          treeinfo->subnodes[i]->length = old_brlens[treeinfo->subnodes[i]->pmatrix_index];
+        if (treeinfo->subnode_count > 0) {
+          for (i = 0; i < treeinfo->subnode_count; ++i) {
+            treeinfo->subnodes[i]->length = old_brlens[treeinfo->subnodes[i]->pmatrix_index];
+          }
+        } else {
+          for (i = 0; i < treeinfo->tree->edge_count; ++i) {
+            treeinfo->branch_lengths[0][i] = old_brlens[i];
+          }
+        }
 
         /* restore initial branch length scalers */
         if (treeinfo->brlen_scalers)
