@@ -729,7 +729,7 @@ static pll_bool_t fix_brlen_minmax(pllmod_treeinfo_t * treeinfo, double blmin, d
       if (treeinfo->branch_lengths[0][i] < blmin) {
         treeinfo->branch_lengths[0][i] = blmin;
         brlen_fixed = PLL_TRUE;
-      } else if (treeinfo->branch_lengths[p][i] > blmax) {
+      } else if (treeinfo->branch_lengths[0][i] > blmax) {
         treeinfo->branch_lengths[0][i] = blmax;
         brlen_fixed = PLL_TRUE;
       }
