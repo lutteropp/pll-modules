@@ -954,7 +954,8 @@ PLL_EXPORT void pllmod_treeinfo_invalidate_clv(pllmod_treeinfo_t * treeinfo,
 
 static double treeinfo_compute_loglh(void * treeinfo_param,
                                      int incremental,
-                                     int update_pmatrices)
+                                     int update_pmatrices,
+                                     double ** persite_lnl)
 {
   pllmod_treeinfo_t* treeinfo = (pllmod_treeinfo_t*) treeinfo_param;
 
@@ -1064,7 +1065,7 @@ static double treeinfo_compute_loglh(void * treeinfo_param,
                                             treeinfo->root->back->scaler_index,
                                             treeinfo->root->pmatrix_index,
                                             treeinfo->param_indices[p],
-                                            NULL);
+                                            persite_lnl ? persite_lnl[p] : NULL);
   }
 
   /* sum up likelihood from all threads */
@@ -1091,16 +1092,16 @@ static double treeinfo_compute_loglh(void * treeinfo_param,
 PLL_EXPORT double pllmod_treeinfo_compute_loglh(pllmod_treeinfo_t * treeinfo,
                                                 int incremental)
 {
-  return treeinfo->likelihood_target_function(treeinfo->likelihood_computation_params, incremental, 1);
-  //return treeinfo_compute_loglh(treeinfo, incremental, 1);
+  return treeinfo->likelihood_target_function(treeinfo->likelihood_computation_params, incremental, 1, NULL);
+  //return treeinfo_compute_loglh(treeinfo, incremental, 1, NULL);
 }
 
 PLL_EXPORT double pllmod_treeinfo_compute_loglh_flex(pllmod_treeinfo_t * treeinfo,
                                                      int incremental,
                                                      int update_pmatrices)
 {
-  return treeinfo->likelihood_target_function(treeinfo->likelihood_computation_params, incremental, update_pmatrices);
-  //return treeinfo_compute_loglh(treeinfo, incremental, update_pmatrices);
+  return treeinfo->likelihood_target_function(treeinfo->likelihood_computation_params, incremental, update_pmatrices, NULL);
+  //return treeinfo_compute_loglh(treeinfo, incremental, update_pmatrices, NULL);
 }
 
 PLL_EXPORT
