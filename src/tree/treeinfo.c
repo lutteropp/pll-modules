@@ -27,10 +27,6 @@ static int treeinfo_check_tree(pllmod_treeinfo_t * treeinfo,
                                pll_utree_t * tree);
 static int treeinfo_init_tree(pllmod_treeinfo_t * treeinfo);
 
-static double treeinfo_compute_loglh(void * treeinfo_param,
-                                     int incremental,
-                                     int update_pmatrices);
-
 /* a callback function for performing a full traversal */
 static int cb_full_traversal(pll_unode_t * node)
 {
