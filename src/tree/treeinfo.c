@@ -1097,6 +1097,14 @@ PLL_EXPORT double pllmod_treeinfo_compute_loglh(pllmod_treeinfo_t * treeinfo,
   //return treeinfo_compute_loglh(treeinfo, incremental, 1, NULL);
 }
 
+PLL_EXPORT double pllmod_treeinfo_compute_loglh_persite(pllmod_treeinfo_t * treeinfo,
+                                                int incremental, 
+                                                double ** persite_lnl)
+{
+  return treeinfo->likelihood_target_function(treeinfo->likelihood_computation_params, incremental, 1, persite_lnl);
+  //return treeinfo_compute_loglh(treeinfo, incremental, 1, NULL);
+}
+
 PLL_EXPORT double pllmod_treeinfo_compute_loglh_flex(pllmod_treeinfo_t * treeinfo,
                                                      int incremental,
                                                      int update_pmatrices)
