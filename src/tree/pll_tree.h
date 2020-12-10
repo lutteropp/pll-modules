@@ -267,12 +267,14 @@ typedef struct treeinfo
   void * likelihood_computation_params;
   double (*likelihood_target_function)(void *, // the likelihood_computation_params
 					   int, // incremental
-					   int); // update_pmatrices
+					   int, // update_pmatrices
+             double **); // persite_lnl
 
   // default likelihood stuff
   double (*default_likelihood_target_function)(void *, // the likelihood_computation_params
   					   int, // incremental
-  					   int); // update_pmatrices
+  					   int, // update_pmatrices
+              double **); // persite_lnl
   void * default_likelihood_computation_params;
 } pllmod_treeinfo_t;
 
