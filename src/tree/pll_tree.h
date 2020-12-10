@@ -267,12 +267,14 @@ typedef struct treeinfo
   void * likelihood_computation_params;
   double (*likelihood_target_function)(void *, // the likelihood_computation_params
 					   int, // incremental
-					   int); // update_pmatrices
+					   int, // update_pmatrices
+                                           double **); // persite_lnl
 
   // default likelihood stuff
   double (*default_likelihood_target_function)(void *, // the likelihood_computation_params
   					   int, // incremental
-  					   int); // update_pmatrices
+					   int, // update_pmatrices
+                                           double **); // persite_lnl
   void * default_likelihood_computation_params;
 } pllmod_treeinfo_t;
 
@@ -572,6 +574,8 @@ PLL_EXPORT int pllmod_utree_outgroup_root(pll_utree_t * tree,
                                           unsigned int outgroup_size,
                                           int add_root_node);
 
+PLL_EXPORT int pllmod_utree_collapse_branches(pll_utree_t * tree,
+                                              double min_brlen);
 
 PLL_EXPORT double pllmod_utree_compute_lk(pll_partition_t * partition,
                                        pll_unode_t * tree,
@@ -679,6 +683,10 @@ PLL_EXPORT double pllmod_treeinfo_compute_loglh(pllmod_treeinfo_t * treeinfo,
 PLL_EXPORT double pllmod_treeinfo_compute_loglh_flex(pllmod_treeinfo_t * treeinfo,
                                                      int incremental,
                                                      int update_pmatrices);
+
+PLL_EXPORT double pllmod_treeinfo_compute_loglh_persite(pllmod_treeinfo_t * treeinfo,
+                                                        int incremental,
+                                                        double ** persite_lnl);
 
 PLL_EXPORT
 int pllmod_treeinfo_scale_branches_all(pllmod_treeinfo_t * treeinfo, double scaler);
