@@ -546,6 +546,8 @@ PLL_EXPORT int pllmod_utree_traverse_apply(pll_unode_t * root,
 
 PLL_EXPORT int pllmod_utree_is_tip(const pll_unode_t * node);
 
+PLL_EXPORT int pllmod_rtree_is_tip(const pll_rnode_t * node); 
+
 PLL_EXPORT void pllmod_utree_set_length(pll_unode_t * edge,
                                      double length);
 
@@ -732,7 +734,7 @@ pllmod_tbe_split_info_t * pllmod_utree_tbe_nature_init(pll_unode_t * ref_root,
                                                        const pll_unode_t ** split_to_node_map);
 
 /* Compute Transfer Support (Lemoine et al., Nature 2018) for every split in ref_splits.
- * Sarahs implementation of the algorithm from the Nature paper. */
+ * Sarah's implementation of the algorithm from the Nature paper. */
 PLL_EXPORT int pllmod_utree_tbe_nature(pll_split_t * ref_splits,
                                        pll_split_t * bs_splits,
                                        pll_unode_t* bs_root,

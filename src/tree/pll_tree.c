@@ -1207,6 +1207,11 @@ PLL_EXPORT int pllmod_utree_is_tip(const pll_unode_t * node)
   return (node->next == NULL);
 }
 
+PLL_EXPORT int pllmod_rtree_is_tip(const pll_rnode_t * node)
+{
+  return (node->left == NULL && node->right == NULL);
+}
+
 PLL_EXPORT void pllmod_utree_set_length(pll_unode_t * edge,
                                             double length)
 {
@@ -1418,10 +1423,12 @@ static int rtree_traverse_apply(pll_rnode_t * node,
                                    cb_in_trav,
                                    cb_post_trav,
                                    data);
+  }
 
-    if (cb_in_trav && !cb_in_trav(node,  data))
-      return PLL_FAILURE;
+  if (cb_in_trav && !cb_in_trav(node,  data))
+    return PLL_FAILURE;
 
+  if (node->right) {
     retval &= rtree_traverse_apply(node->right,
                                    cb_pre_trav,
                                    cb_in_trav,
