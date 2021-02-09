@@ -1,0 +1,3 @@
+[submodule "libs/libpll"]
+	path = libs/libpll
+	url = https://github.com/lutteropp/libpll-2.git
