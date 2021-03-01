@@ -325,11 +325,17 @@ static double compute_negative_lnl_unrooted (void * p, double *x)
 
   if (params->lk_params.rooted)
   {
+    unsigned int* scaler = NULL;
+    if (params->lk_params.where.rooted_t.scaler_index != PLL_SCALE_BUFFER_NONE) {
+      scaler = partition->scale_buffer[params->lk_params.where.rooted_t.scaler_index];
+    }
+
     score = -1
         * pll_compute_root_loglikelihood (
             partition,
             params->lk_params.where.rooted_t.root_clv_index,
-            params->lk_params.where.rooted_t.scaler_index,
+            partition->clv[params->lk_params.where.rooted_t.root_clv_index],
+            scaler,
             params->lk_params.params_indices,
             NULL);
   }
