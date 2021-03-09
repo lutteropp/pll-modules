@@ -1058,12 +1058,27 @@ static double treeinfo_compute_loglh(void * treeinfo_param,
        the CLV indices at the two end-point of the branch, the probability
        matrix index for the concrete branch length, and the index of the model
        of whose frequency vector is to be used */
+    unsigned int * root_back_scaler;
+    unsigned int * root_scaler;
+
+    if (treeinfo->root->back->scaler_index == PLL_SCALE_BUFFER_NONE)
+      root_back_scaler = NULL;
+    else
+      root_back_scaler = treeinfo->partitions[p]->scale_buffer[treeinfo->root->back->scaler_index];
+
+    if (treeinfo->root->scaler_index == PLL_SCALE_BUFFER_NONE)
+      root_scaler = NULL;
+    else
+      root_scaler = treeinfo->partitions[p]->scale_buffer[treeinfo->root->clv_index];
+
     treeinfo->partition_loglh[p] = pll_compute_edge_loglikelihood(
                                             treeinfo->partitions[p],
                                             treeinfo->root->clv_index,
-                                            treeinfo->root->scaler_index,
+                                            treeinfo->partitions[p]->clv[treeinfo->root->clv_index],
+                                            root_scaler,
                                             treeinfo->root->back->clv_index,
-                                            treeinfo->root->back->scaler_index,
+                                            treeinfo->partitions[p]->clv[treeinfo->root->back->clv_index],
+                                            root_back_scaler,
                                             treeinfo->root->pmatrix_index,
                                             treeinfo->param_indices[p],
                                             persite_lnl ? persite_lnl[p] : NULL);

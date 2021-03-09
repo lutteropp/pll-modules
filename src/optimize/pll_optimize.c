@@ -341,13 +341,28 @@ static double compute_negative_lnl_unrooted (void * p, double *x)
   }
   else
   {
+    unsigned int * parent_scaler;
+    unsigned int * child_scaler;
+
+    if (params->lk_params.where.unrooted_t.parent_scaler_index == PLL_SCALE_BUFFER_NONE)
+      parent_scaler = NULL;
+    else
+      parent_scaler = partition->scale_buffer[params->lk_params.where.unrooted_t.parent_scaler_index];
+
+    if (params->lk_params.where.unrooted_t.child_scaler_index == PLL_SCALE_BUFFER_NONE)
+      child_scaler = NULL;
+    else
+      child_scaler = partition->scale_buffer[params->lk_params.where.unrooted_t.child_scaler_index];
+
     score = -1
         * pll_compute_edge_loglikelihood (
             partition,
             params->lk_params.where.unrooted_t.parent_clv_index,
-            params->lk_params.where.unrooted_t.parent_scaler_index,
+            partition->clv[params->lk_params.where.unrooted_t.parent_clv_index],
+            parent_scaler,
             params->lk_params.where.unrooted_t.child_clv_index,
-            params->lk_params.where.unrooted_t.child_scaler_index,
+            partition->clv[params->lk_params.where.unrooted_t.child_clv_index],
+            child_scaler,
             params->lk_params.where.unrooted_t.edge_pmatrix_index,
             params->lk_params.params_indices,
             NULL);
@@ -840,11 +855,26 @@ static int recomp_iterative (pll_newton_tree_params_t * params,
     if (check_loglh_improvement(params->opt_method))
     {
       /* check and compare likelihood */
+      unsigned int * tr_p_scaler;
+      unsigned int * tr_p_back_scaler;
+
+      if (tr_p->scaler_index == PLL_SCALE_BUFFER_NONE)
+        tr_p_scaler = NULL;
+      else
+        tr_p_scaler = params->partition->scale_buffer[tr_p->scaler_index];
+
+      if (tr_p->back->scaler_index == PLL_SCALE_BUFFER_NONE)
+        tr_p_back_scaler = NULL;
+      else
+        tr_p_back_scaler = params->partition->scale_buffer[tr_p->back->scaler_index];
+
       double eval_loglikelihood = pll_compute_edge_loglikelihood (params->partition,
                                                                   tr_p->clv_index,
-                                                                  tr_p->scaler_index,
+                                                                  params->partition->clv[tr_p->clv_index],
+                                                                  tr_p_scaler,
                                                                   tr_p->back->clv_index,
-                                                                  tr_p->back->scaler_index,
+                                                                  params->partition->clv[tr_p->back->clv_index],
+                                                                  tr_p_back_scaler,
                                                                   tr_p->pmatrix_index,
                                                                   params->params_indices,
                                                                   NULL);
@@ -994,12 +1024,27 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local (
     return (double)PLL_FAILURE;
   }
 
+  unsigned int * tree_back_scaler;
+  unsigned int * tree_scaler;
+
+  if (tree->back->scaler_index == PLL_SCALE_BUFFER_NONE)
+    tree_back_scaler = NULL;
+  else
+    tree_back_scaler = partition->scale_buffer[tree->back->scaler_index];
+
+  if (tree->scaler_index == PLL_SCALE_BUFFER_NONE)
+    tree_scaler = NULL;
+  else
+    tree_scaler = partition->scale_buffer[tree->back->scaler_index];
+
   /* get the initial likelihood score */
   loglikelihood = pll_compute_edge_loglikelihood (partition,
                                                   tree->back->clv_index,
-                                                  tree->back->scaler_index,
+                                                  partition->clv[tree->back->clv_index],
+                                                  tree_back_scaler,
                                                   tree->clv_index,
-                                                  tree->scaler_index,
+                                                  partition->clv[tree->clv_index],
+                                                  tree_scaler,
                                                   tree->pmatrix_index,
                                                   params_indices,
                                                   NULL);
@@ -1062,9 +1107,11 @@ PLL_EXPORT double pllmod_opt_optimize_branch_lengths_local (
     /* compute likelihood after optimization */
     new_loglikelihood = pll_compute_edge_loglikelihood (partition,
                                                         tree->back->clv_index,
-                                                        tree->back->scaler_index,
+                                                        partition->clv[tree->back->clv_index],
+                                                        tree_back_scaler,
                                                         tree->clv_index,
-                                                        tree->scaler_index,
+                                                        partition->clv[tree->clv_index],
+                                                        tree_scaler,
                                                         tree->pmatrix_index,
                                                         params_indices,
                                                         NULL);
@@ -1210,11 +1257,26 @@ PLL_EXPORT double pllmod_opt_compute_edge_loglikelihood_multi(
     if (!partitions[p])
       continue;
 
+    unsigned int * parent_scaler;
+    unsigned int * child_scaler;
+
+    if (parent_scaler_index == PLL_SCALE_BUFFER_NONE)
+      parent_scaler = NULL;
+    else
+      parent_scaler = partitions[p]->scale_buffer[parent_scaler_index];
+
+    if (child_scaler_index == PLL_SCALE_BUFFER_NONE)
+      child_scaler = NULL;
+    else
+      child_scaler = partitions[p]->scale_buffer[child_scaler_index];
+
     total_loglh += pll_compute_edge_loglikelihood(partitions[p],
                                                   parent_clv_index,
-                                                  parent_scaler_index,
+                                                  partitions[p]->clv[parent_clv_index],
+                                                  parent_scaler,
                                                   child_clv_index,
-                                                  child_scaler_index,
+                                                  partitions[p]->clv[child_clv_index],
+                                                  child_scaler,
                                                   matrix_index,
                                                   params_indices[p],
                                                   NULL);

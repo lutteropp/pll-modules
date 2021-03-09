@@ -1321,11 +1321,25 @@ PLL_EXPORT double pllmod_utree_compute_lk(pll_partition_t * partition,
                                 (void *) &parameters);
   }
 
+  unsigned int * tree_back_scaler;
+  unsigned int * tree_scaler;
+
+  if (tree->back->scaler_index == PLL_SCALE_BUFFER_NONE)
+    tree_back_scaler = NULL;
+  else
+    tree_back_scaler = partition->scale_buffer[tree->back->scaler_index];
+
+  if (tree->scaler_index == PLL_SCALE_BUFFER_NONE)
+    tree_scaler = NULL;
+  else
+    tree_scaler = partition->scale_buffer[tree->back->scaler_index];
   double logl = pll_compute_edge_loglikelihood(partition,
                                               tree->clv_index,
-                                              tree->scaler_index,
+                                              partition->clv[tree->clv_index],
+                                              tree_scaler,
                                               tree->back->clv_index,
-                                              tree->back->scaler_index,
+                                              partition->clv[tree->back->clv_index],
+                                              tree_back_scaler,
                                               tree->pmatrix_index,
                                               params_indices,
                                               NULL);
